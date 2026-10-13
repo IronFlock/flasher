@@ -1,4 +1,4 @@
 provider: github
-owner: RecordEvolution
-repo: FlockFlasher
+owner: IronFlock
+repo: flasher
 updaterCacheDirName: flockflasher-updater

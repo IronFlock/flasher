@@ -22,8 +22,8 @@ win:
   requestedExecutionLevel: requireAdministrator
   publish:
     provider: github
-    owner: RecordEvolution
-    repo: FlockFlasher
+    owner: IronFlock
+    repo: flasher
     updaterCacheDirName: flockflasher-updater
 nsis:
   artifactName: ${name}-setup.${ext}
@@ -42,8 +42,8 @@ mac:
   notarize: false
   publish:
     provider: github
-    owner: RecordEvolution
-    repo: FlockFlasher
+    owner: IronFlock
+    repo: flasher
     updaterCacheDirName: flockflasher-updater
 dmg:
   artifactName: ${name}-${arch}.${ext}
@@ -52,8 +52,8 @@ linux:
     - AppImage
   publish:
     provider: github
-    owner: RecordEvolution
-    repo: FlockFlasher
+    owner: IronFlock
+    repo: flasher
     updaterCacheDirName: flockflasher-updater
 appImage:
   artifactName: ${name}.${ext}

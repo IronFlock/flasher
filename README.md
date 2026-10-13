@@ -16,7 +16,7 @@ The machine itself should do the rest.
 
 On Github, it should automatically create a release entry in the list with the latest version string.
 
-[Releases](https://github.com/RecordEvolution/FlockFlasher/releases)
+[Releases](https://github.com/IronFlock/flasher/releases)
 
 Before putting the release public, make sure that all releases have been pushed for all devices.
 
@@ -66,7 +66,7 @@ In the current build for MacOS and Linux, we must spawn a subprocess within the 
 
 The easiest way to do that is to spawn a root process using sudo. This process will be a node process that runs the `etcher-sdk` code.
 
-To do so, we create an external JavaScript script that uses the `etcher-sdk`. This script needs to point to the node_modules that are contained within the application (for production). To do so, we point to the compressed (ASAR) node_modules [in the code](https://github.com/RecordEvolution/FlockFlasher/blob/3400ca34a438af2653ee1dfc364cd3f066cdc7fd/src/main/api/flash.ts#L121).
+To do so, we create an external JavaScript script that uses the `etcher-sdk`. This script needs to point to the node_modules that are contained within the application (for production). To do so, we point to the compressed (ASAR) node_modules [in the code](https://github.com/IronFlock/flasher/blob/3400ca34a438af2653ee1dfc364cd3f066cdc7fd/src/main/api/flash.ts#L121).
 
 
 To learn more about the compressed ASAR package: https://www.electronjs.org/docs/latest/tutorial/asar-archives
@@ -76,7 +76,7 @@ Since we don't want to rely on the user having the `node` binary installed, we c
 
 The electron binary can be accessed on `process.execPath` within the application and can be put into 'node mode' using the `ELECTRON_RUN_AS_NODE` environment variable.
 
-Since we spawn a subprocess, we need to be able to read back the flashing progress of this subprocess. To do so, we print the progress data to the stdout in JSON string, which is then read and parsed in the frontend. ([Line in code](https://github.com/RecordEvolution/FlockFlasher/blob/3400ca34a438af2653ee1dfc364cd3f066cdc7fd/src/main/api/flash.ts#L154))
+Since we spawn a subprocess, we need to be able to read back the flashing progress of this subprocess. To do so, we print the progress data to the stdout in JSON string, which is then read and parsed in the frontend. ([Line in code](https://github.com/IronFlock/flasher/blob/3400ca34a438af2653ee1dfc364cd3f066cdc7fd/src/main/api/flash.ts#L154))
 
 
 ### Windows
@@ -100,7 +100,7 @@ winusbcoinstaller2.dll
 
 ### AppImages (Linux)
 
-For AppImages, it is sadly not straightforward to access the packaged node_modules within the application. Since the AppImage is technically a drive, we must first mount it to a temporary folder ([link to code](https://github.com/RecordEvolution/FlockFlasher/blob/3400ca34a438af2653ee1dfc364cd3f066cdc7fd/src/main/api/permissions.ts#L169)) and then access the packaged node modules within.
+For AppImages, it is sadly not straightforward to access the packaged node_modules within the application. Since the AppImage is technically a drive, we must first mount it to a temporary folder ([link to code](https://github.com/IronFlock/flasher/blob/3400ca34a438af2653ee1dfc364cd3f066cdc7fd/src/main/api/permissions.ts#L169)) and then access the packaged node modules within.
 
 
 ## Electron / Vue

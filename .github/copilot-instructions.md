@@ -67,7 +67,7 @@ etcher-sdk `scanner` adapters (BlockDevice, Usbboot, DriverlessDevice on Windows
 ## Release Process
 1. Bump version in `package.json` **and** `package-lock.json`.
 2. Set `GH_TOKEN` env var, then run the platform-specific `npm run build:*` on each target machine.
-3. Releases land in [GitHub Releases](https://github.com/RecordEvolution/FlockFlasher/releases); keep the release private until all platforms are uploaded.
+3. Releases land in [GitHub Releases](https://github.com/IronFlock/flasher/releases); keep the release private until all platforms are uploaded.
 
 ### macOS
 - Notarization runs automatically after signing (`scripts/notarize.js`, notarytool): needs `APPLEID` and `APPLEIDPASS` (app-specific password) in `.env`.

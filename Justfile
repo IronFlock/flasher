@@ -60,8 +60,8 @@ bump-major:
 # -----------------------------------------------------------------------------
 # Release: build + publish to GitHub Releases for the CURRENT OS. Run once per
 # target machine (macOS arm64 / Windows / Linux), as described in the README.
-# Requires GH_TOKEN in the environment; on macOS also APPLEID + APPLEIDPASS in
-# .env for notarization.
+# Uses GH_TOKEN from the environment or .env, else the gh CLI login; on macOS
+# also APPLEID + APPLEIDPASS in .env for notarization.
 # -----------------------------------------------------------------------------
 
 # Build + publish the current OS's artifact to GitHub Releases.
@@ -73,7 +73,14 @@ release:
     # matching the project convention (scripts/notarize.js also reads .env via dotenv).
     # An already-exported GH_TOKEN in the shell still wins if .env doesn't define one.
     if [ -f .env ]; then set -a; . ./.env; set +a; fi
-    : "${GH_TOKEN:?set GH_TOKEN in .env or your environment to publish to GitHub Releases}"
+    # Without an explicit GH_TOKEN, use the gh CLI login (scoped to whatever the
+    # account can reach, IronFlock/flasher included). A static PAT in .env dies
+    # silently on revocation or when the repo moves to another owner.
+    if [ -z "${GH_TOKEN:-}" ]; then
+        GH_TOKEN="$(env -u GITHUB_TOKEN gh auth token 2>/dev/null || true)"
+        export GH_TOKEN
+    fi
+    : "${GH_TOKEN:?set GH_TOKEN, or log in with gh auth login, to publish to GitHub Releases}"
     npm run build
     npx --no-install electron-builder {{BUILDER_TARGET}} --publish always
 
