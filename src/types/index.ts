@@ -115,7 +115,7 @@ export type Progress = {
   eta: number
 }
 
-// Progress of the background device-agent (reagent) binary download.
+// Progress of the background IronFlock device agent binary download.
 export type AgentDownloadState = 'idle' | 'downloading' | 'finished' | 'failed'
 export type AgentDownloadStatus = { state: AgentDownloadState; progress?: Partial<Progress> }
 

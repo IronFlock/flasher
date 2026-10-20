@@ -14,7 +14,7 @@ type AgentStoreState = {
   initialized: boolean
 }
 // escapeXML HTML-escapes each log line before converting ANSI codes to spans, so
-// markup in reagent/container output (rendered via v-html) can't inject HTML/JS.
+// markup in device agent/container output (rendered via v-html) can't inject HTML/JS.
 const ansi_converter = new Convert({ stream: true, bg: '#fff', fg: '#000', escapeXML: true })
 
 export const useAgentStore = () => {

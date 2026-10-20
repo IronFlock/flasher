@@ -6,6 +6,11 @@ import { childProcess, execAsync, spawnAsync } from './permissions'
 import fs, { access, mkdir } from 'fs/promises'
 import { ChildProcessWithoutNullStreams } from 'child_process'
 import { EventEmitter } from 'stream'
+import { AVAILABLE_VERSIONS_URL, agentBinaryName, downloadAgentBinary } from './agent-release'
+
+// Names used by earlier builds, when the agent was still called "REagent". They are
+// only referenced to clean up leftovers from an existing install.
+const LEGACY_FILES = ['reagent', 'reagent.exe', 'reagent.log', 'reagent.db']
 
 type AgentState = 'active' | 'inactive' | 'failed'
 
@@ -31,8 +36,7 @@ class AgentManager extends EventEmitter {
   private downloadStatus: AgentDownloadStatus = { state: 'idle' }
   private agentProcess: ChildProcessWithoutNullStreams | null = null
   private agentDir = path.join(REFLASHER_CONFIG_PATH, 'agent')
-  private availableVersionsURL =
-    'https://instance-registry.ironflock.com/dl/re-agent/availableVersions.json'
+  private availableVersionsURL = AVAILABLE_VERSIONS_URL
 
   constructor() {
     super()
@@ -79,7 +83,7 @@ class AgentManager extends EventEmitter {
   }
 
   get binaryName() {
-    return `reagent${this.os === 'windows' ? '.exe' : ''}`
+    return agentBinaryName(this.os)
   }
 
   get agentPath() {
@@ -131,8 +135,8 @@ class AgentManager extends EventEmitter {
 
     if (this.agentProcess) throw new Error('an existing agent process is already running!')
 
-    const logFilePath = path.join(this.agentDir, 'reagent.log')
-    const dbFilePath = path.join(this.agentDir, 'reagent.db')
+    const logFilePath = path.join(this.agentDir, 'device-agent.log')
+    const dbFilePath = path.join(this.agentDir, 'device-agent.db')
     const appsDir = path.join(this.agentDir, 'apps')
 
     await fs.rm(dbFilePath, { force: true })
@@ -223,15 +227,32 @@ class AgentManager extends EventEmitter {
   async downloadAgent(progress?: (progress: Partial<Progress>) => void) {
     const latestVersion = await this.getLatestVersion()
 
-    const agentDownloadURL = `https://instance-registry.ironflock.com/dl/re-agent/${this.os}/${this.architecture}/${latestVersion}/${this.binaryName}`
-
     if (progress) {
       progress({ averageSpeed: 0, eta: 0, percentage: 0, speed: 0, bytesWritten: 0 })
     }
 
-    this.downloadPromise = downloadFile(agentDownloadURL, this.agentPath, progress, { mode: 0o755 })
+    // The binary is only moved into place after its SHA-256 matches the published
+    // checksum; a mismatch rejects and leaves no file behind.
+    this.downloadPromise = downloadAgentBinary(
+      {
+        os: this.os,
+        arch: this.architecture,
+        version: latestVersion,
+        destPath: this.agentPath,
+        progress
+      },
+      { download: downloadFile }
+    ).then(() => this.removeLegacyFiles())
 
     return this.downloadPromise
+  }
+
+  // Best-effort removal of the files an older build left behind under the previous
+  // agent name. The log and db are recreated on every start, so nothing is lost.
+  private async removeLegacyFiles() {
+    await Promise.all(
+      LEGACY_FILES.map((name) => fs.rm(path.join(this.agentDir, name), { force: true }))
+    ).catch(() => undefined)
   }
 }
 

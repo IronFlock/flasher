@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAgentStore } from '@renderer/store/agent'
 
-// Non-modal feedback for the background device-agent (reagent) download. The
+// Non-modal feedback for the background IronFlock device agent download. The
 // download can begin at app launch; useAgentStore() seeds the current status so
 // progress shows even if it started before this component mounted.
 const agentStore = useAgentStore()

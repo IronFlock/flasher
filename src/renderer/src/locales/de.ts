@@ -74,15 +74,15 @@ export default {
   please_ensure_environment_variables:
     'Um den FlockFlasher zu benutzen, stellen Sie bitte sicher, dass diese Umgebungsvariable richtig definiert wurde. | Um den FlockFlasher verwenden zu können, stellen Sie bitte sicher, dass die Umgebungsvariablen richtig definiert wurden.',
   exit_reflasher: 'FlockFlasher beenden',
-  update_reagent: 'REagent aktualisieren',
-  download_reagent: 'REagent herunterladen',
+  update_reagent: 'IronFlock Device Agent aktualisieren',
+  download_reagent: 'IronFlock Device Agent herunterladen',
   docker_is_not_running: 'Docker läuft nicht',
   what_is_reagent_explanation:
-    'Der REagent ist die Anwendung, die für die Verwaltung von Reswarm Anwendungen auf einem Reswarm Gerät verantwortlich ist.',
+    'Der IronFlock Device Agent ist die Anwendung, die für die Verwaltung von IronFlock Anwendungen auf einem IronFlock Gerät verantwortlich ist.',
   in_order_to_test_agent_is_required:
-    'Um das Gerät auf Ihrem lokalen Computer testen zu können, müssen Sie die REagent herunterladen.',
+    'Um das Gerät auf Ihrem lokalen Computer testen zu können, müssen Sie den IronFlock Device Agent herunterladen.',
   agent_update_available:
-    'Ein Update für das REagent ist verfügbar! Fahren Sie mit dem Herunterladen des Updates fort.',
+    'Ein Update für den IronFlock Device Agent ist verfügbar! Fahren Sie mit dem Herunterladen des Updates fort.',
   docker_is_required:
     '<strong>Docker ist erforderlich</strong>, um Ihr Record Evolution Gerät zu testen',
   make_sure_docker_is_running:

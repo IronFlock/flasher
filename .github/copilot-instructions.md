@@ -59,7 +59,7 @@ The main process runs as **root**, and `.flock`/`.reswarm` files plus board meta
 3. Backwards compatibility: `.flock` configs are always duplicated as `.reswarm` on the device.
 
 ### Device test mode (`agent.ts`)
-`AgentManager` downloads the `reagent` binary from the instance registry into `~/.Reflasher/agent` and can run a "virtual device" locally against a `.flock` config. Requires a running Docker daemon (`hasDocker()`); streams agent logs/state to the renderer.
+`AgentManager` downloads the `device-agent` binary from the instance registry (verified against its published SHA-256 checksum) into `~/.Reflasher/agent` and can run a "virtual device" locally against a `.flock` config. Requires a running Docker daemon (`hasDocker()`); streams agent logs/state to the renderer.
 
 ### Drive discovery (`drives.ts` + `ipcHandlers.ts`)
 etcher-sdk `scanner` adapters (BlockDevice, Usbboot, DriverlessDevice on Windows) push attach/detach events to the renderer; `drivelist` handles listing/partitions and `mountutils` mounting.
