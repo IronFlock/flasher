@@ -1,0 +1,51 @@
+# Gate (eslint and type checks, Vitest, the app bundle) and workflow lint from
+# the shared IronFlock CI harness. The packaging steps of the install
+# (scripts/postinstall.js) are skipped in CI.
+# Pull requests into main only: the ruleset lets nothing reach main without
+# ci-ok. The release intent decides whether the merge releases.
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  gate:
+    uses: IronFlock/workflows/.github/workflows/node-gate.yml@v1
+    with:
+      package-manager: npm
+      node-version: "22"
+
+  workflows:
+    uses: IronFlock/workflows/.github/workflows/workflows-lint.yml@v1
+
+  # The version decides: a bump makes a release PR (`just release-patch`,
+  # title `release flockflasher v<version>`), an unchanged version a
+  # no-release PR (`just merge`) whose merge releases nothing.
+  intent:
+    uses: IronFlock/workflows/.github/workflows/release-intent.yml@v1
+    with:
+      version-file: package.json
+
+  # The required check of the main-branch ruleset: green only when every job
+  # above succeeded (skipped or cancelled counts as failed).
+  ci-ok:
+    if: ${{ always() }}
+    needs: [gate, workflows, intent]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: all ci jobs succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          for r in $RESULTS; do [ "$r" = success ] || exit 1; done
