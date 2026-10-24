@@ -6,11 +6,14 @@ All you need to debug the application is:
 
 ## Rolling out a new version
 
-Make sure to replace the version string in the `package.json` and `package-lock.json`.
+`main` takes changes only through pull requests whose checks are green. `just release-patch`
+(or `-minor`, `-major`) on a feature branch bumps the version in `package.json` and
+`package-lock.json`, opens the release pull request and waits for its merge; the merge sets the
+tag `v<version>`. Changes that release nothing go in with `just merge`.
 
-Next to that, you also need to set your `GH_TOKEN` as an environment variable in the terminal that you wish to release the application. This token can be created from your own Github account; this token gives the application access to your Github account.
-
-After that, run `npm run build` followed by `npm run release` on every machine that you wish to create a version on.
+Then, on every machine that you wish to create a version on (macOS first, it notarizes), check out
+that tag (`git fetch --tags && git switch --detach v<version>`) and run `just release`. It uses
+`GH_TOKEN` from the environment or `.env`, else your `gh` login.
 
 The machine itself should do the rest.
 
@@ -142,7 +145,7 @@ The fix: the elevated flash + unmount subprocesses run under a **bundled standal
 `resources/binaries/<platform>/`. The flash-path native deps that are N-API (`drivelist`,
 `@ronomon/direct-io`, `xxhash-addon`) work under both runtimes unchanged; `mountutils` (nan) is
 rebuilt for the bundled Node's ABI by `scripts/rebuild-flash-natives.js` (postinstall, after
-`install-app-deps`). Keep `NODE_VERSION` in sync between those two scripts. When upgrading Electron,
+`install-app-deps`; CI skips these packaging steps, see `scripts/postinstall.js`). Keep `NODE_VERSION` in sync between those two scripts. When upgrading Electron,
 bump both `package.json` `electron` and `electron-builder.yml` `electronVersion`.
 
 The native modules (`drivelist`, `mountutils`) compile from source on macOS, so `npm install`

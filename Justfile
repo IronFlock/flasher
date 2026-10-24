@@ -5,11 +5,11 @@ set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 ROOT_DIR := justfile_directory()
 VERSION := `node -p "require('./package.json').version"`
 
-# Release contract — see REDeployments/docs/RELEASE.md. Single-project repo,
-# so the tag is plain `v<version>`.
+# Release names (see the release section below); the tag is `v<version>`.
 RELEASE_NAME := "flockflasher"
+VERSION_FILE := "package.json"
+# Every file _write-version changes; the release commit holds exactly these.
 VERSION_FILES := "package.json package-lock.json"
-RELEASE_TAG := "v" + VERSION
 
 # electron-builder target for the CURRENT OS. macOS builds arm64 only — the
 # amd64/x64 mac build was dropped, which also removes the manual latest-mac.yml
@@ -22,6 +22,12 @@ default:
 # Start the local dev environment (electron-vite with HMR).
 dev:
     npm run dev
+
+# Static checks without changing files (`npm run lint` fixes): eslint and
+# the type checks. The CI gate runs lint, test and build.
+lint:
+    npx eslint .
+    npm run typecheck
 
 # Run the unit tests (Vitest).
 test:
@@ -36,30 +42,9 @@ preview: build
     npm run start
 
 # -----------------------------------------------------------------------------
-# Version bumping. Edits package.json + package-lock.json only — no git commit,
-# so you can review the change first. Normally you don't call these directly:
-# `just release-patch` runs the bump, the build+publish and the release commit
-# in one go.
-# -----------------------------------------------------------------------------
-
-# Bump the patch version (x.y.Z).
-bump-patch:
-    npm version patch --no-git-tag-version
-    @echo "Bumped patch. To bump, build, publish, commit and tag in one step: just release-patch"
-
-# Bump the minor version (x.Y.0).
-bump-minor:
-    npm version minor --no-git-tag-version
-    @echo "Bumped minor. To bump, build, publish, commit and tag in one step: just release-minor"
-
-# Bump the major version (X.0.0).
-bump-major:
-    npm version major --no-git-tag-version
-    @echo "Bumped major. To bump, build, publish, commit and tag in one step: just release-major"
-
-# -----------------------------------------------------------------------------
 # Release: build + publish to GitHub Releases for the CURRENT OS. Run once per
-# target machine (macOS arm64 / Windows / Linux), as described in the README.
+# target machine (macOS arm64 / Windows / Linux), from the tag that the merge
+# of a release pull request set (see the release section below and the README).
 # Uses GH_TOKEN from the environment or .env, else the gh CLI login; on macOS
 # also APPLEID + APPLEIDPASS in .env for notarization.
 # -----------------------------------------------------------------------------
@@ -85,64 +70,41 @@ release:
     npx --no-install electron-builder {{BUILDER_TARGET}} --publish always
 
 # ------------------------------------------------------------------ release --
-# Release contract — see REDeployments/docs/RELEASE.md
-#
-#   just release-patch = _require-clean -> bump-patch -> release -> _release-commit
-#
-# `release` publishes the CURRENT OS's artifact only, so a full release is
-# `just release-patch` on the FIRST machine (which bumps, publishes, commits
-# and tags), then a bare `just release` on the other two after pulling that
-# commit — same version, same GitHub Release, other platforms' artifacts.
-#
-# The steps run as sub-`just` processes, never as Just dependencies: just
-# evaluates variables once at parse time, so VERSION would still hold the
-# PRE-bump value if these ran as deps — the tag and the commit message would
-# name the old version while package.json already said the new one.
+# Pull requests into main, from IronFlock/workflows (scripts/pr.sh at v1); see
+# its README, "Pull requests from a laptop":
+#   just merge [TITLE]      a no-release pull request from this feature branch
+#   just release-patch      a release pull request (-minor, -major): the bump
+#                           from main's version on top of this branch (or on a
+#                           new branch release/v<x> from an up-to-date main)
+# Both merge automatically once ci and security are green. The merge of a
+# release pull request sets the tag v<version> in CI; then publish the
+# artifacts with a bare `just release` on each OS machine (macOS first: it
+# notarizes), from that tag (`git fetch --tags && git switch --detach v<x>`),
+# into the same GitHub Release.
 
-# Releases come off a clean tree: the release commit must carry the version
-# bump and nothing else, and a tag whose content is unprovable is worse than
-# no tag at all. Commit your work first, with a message that describes it.
-_require-clean:
+# Writes the version; called by pr.sh with the next version.
+_write-version version:
+    npm version "{{version}}" --no-git-tag-version --allow-same-version
+
+[positional-arguments]
+_pr *args:
     #!/usr/bin/env bash
     set -euo pipefail
-    dirty=$(git status --porcelain -- . 2>/dev/null || true)
-    if [ -n "$dirty" ]; then
-        echo "release: uncommitted changes here — commit them first, with a" >&2
-        echo "         message describing the work. The release commit that" >&2
-        echo "         follows carries the version bump alone." >&2
-        echo >&2
-        printf '%s\n' "$dirty" >&2
-        exit 1
-    fi
+    script=$(mktemp)
+    trap 'rm -f "$script"' EXIT
+    gh api -H 'Accept: application/vnd.github.raw' \
+        'repos/IronFlock/workflows/contents/scripts/pr.sh?ref=v1' > "$script"
+    bash "$script" "$@"
 
-# Explicit file list, never `git add -A`: the tree was clean before bump-patch
-# ran, so the version files are the only legitimate change.
-_release-commit:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    git add -- {{VERSION_FILES}}
-    git commit -m "release {{RELEASE_NAME}} v{{VERSION}}"
-    git tag -a "{{RELEASE_TAG}}" -m "release {{RELEASE_NAME}} v{{VERSION}}"
-    git push
-    git push origin "{{RELEASE_TAG}}"
+[positional-arguments]
+merge TITLE="":
+    just _pr merge {{VERSION_FILE}} "$1"
 
-# Bump the patch version, then build + publish for the current OS.
 release-patch:
-    just _require-clean
-    just bump-patch
-    just release
-    just _release-commit
+    just _pr release patch {{RELEASE_NAME}} {{VERSION_FILE}} release.yml {{VERSION_FILES}}
 
-# Bump the minor version, then build + publish for the current OS.
 release-minor:
-    just _require-clean
-    just bump-minor
-    just release
-    just _release-commit
+    just _pr release minor {{RELEASE_NAME}} {{VERSION_FILE}} release.yml {{VERSION_FILES}}
 
-# Bump the major version, then build + publish for the current OS.
 release-major:
-    just _require-clean
-    just bump-major
-    just release
-    just _release-commit
+    just _pr release major {{RELEASE_NAME}} {{VERSION_FILE}} release.yml {{VERSION_FILES}}

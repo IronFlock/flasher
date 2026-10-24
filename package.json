@@ -16,7 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "start": "electron-vite preview",
-    "postinstall": "node scripts/windows.js && node scripts/fetch-node.js && electron-builder install-app-deps && node scripts/rebuild-flash-natives.js",
+    "postinstall": "node scripts/postinstall.js",
     "dev": "electron-vite dev",
     "dev:debug": "electron-vite dev --inspect",
     "release": "electron-builder",
