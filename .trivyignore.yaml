@@ -1,0 +1,17 @@
+# Accepted trivy findings (configuration, licences).
+# Every entry needs a `statement` with the reason and an `expired_at` date at
+# most 12 months ahead; the security summary lists entries that expire within
+# 30 days. Prefer security/vex.openvex.json for "not affected" vulnerabilities.
+vulnerabilities: []
+misconfigurations: []
+secrets: []
+licenses:
+  - id: WTFPL
+    paths:
+      - package-lock.json
+    statement: >-
+      xok 1.0.0 (via etcher-sdk > balena-image-fs > fatfs), a ten-line object
+      extend helper. WTFPL puts no conditions on use or redistribution; trivy
+      lists it as forbidden only because it is not OSI approved (reviewed
+      2026-10-30).
+    expired_at: 2027-10-30

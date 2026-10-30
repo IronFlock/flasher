@@ -1,8 +1,8 @@
 import { spawn, exec, SpawnOptionsWithoutStdio, ExecOptions, ChildProcess } from 'child_process'
+import { randomUUID } from 'crypto'
 import fs from 'fs/promises'
 import { tmpdir } from 'os'
 import path from 'path'
-import { v4 as uuidv4 } from 'uuid'
 import { fileExists, getNodeBinaryPath } from '../utils'
 import { is } from '@electron-toolkit/utils'
 import { buildSudoArgs } from '../security/args'
@@ -91,6 +91,7 @@ export const execAsync = async (
   } & ExecOptions
 ): Promise<{ stdout: string; stderr: string }> => {
   return new Promise((res, rej) => {
+    // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process -- callers pass constant commands only (docker --version, docker ps)
     exec(command, { ...options, encoding: 'utf8' }, (error, stdout, stderr) => {
       if (error) {
         rej(error)
@@ -132,6 +133,7 @@ export const spawnAsync = async (
     const stderrData: string[] = []
     let error: Error | undefined
 
+    // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process -- an argv array, no shell
     const childProcess = spawn(command, args, options)
     activeProcesses.push(childProcess)
 
@@ -189,7 +191,7 @@ const elevatedNodeChildProcessUnix = async (
   options?: SpawnOptionsWithoutStdio,
   useBundledNode = false
 ) => {
-  const uniqueID = uuidv4()
+  const uniqueID = randomUUID()
   const fileName = uniqueID + '.js'
   const scriptPath = path.join(is.dev ? process.resourcesPath : tmpdir(), fileName)
 
@@ -316,6 +318,7 @@ export const childProcess = (
   }
 
   const { elevated, ...optionsWithoutElevated } = options ?? {}
+  // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process -- an argv array, no shell
   const childProcess = spawn(finalCommand, finalArgs, optionsWithoutElevated)
   activeProcesses.push(childProcess)
 
@@ -354,7 +357,7 @@ const nodeChildProcessWindows = async (
   options?: SpawnOptionsWithoutStdio,
   useBundledNode = false
 ) => {
-  const uniqueID = uuidv4()
+  const uniqueID = randomUUID()
   const fileName = uniqueID + '.js'
   const scriptPath = path.join(is.dev ? process.resourcesPath : tmpdir(), fileName)
 
