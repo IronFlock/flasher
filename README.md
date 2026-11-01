@@ -143,5 +143,5 @@ found`, the CLT is missing its C++ stdlib headers — reinstall it:
 
 On Linux, GCC fails on Electron 43's V8 headers with `expected identifier before '__attribute__'`
 when deprecation warnings are on, which node-gyp turns on for every addon.
-`scripts/prepare-natives.js` turns them off for the Electron build on Linux, so a plain
-`npm install` works there.
+`scripts/prepare-natives.js` turns them off for the Electron build on Linux. The `usb` module
+also needs the udev headers: `sudo apt-get install libudev-dev`.
