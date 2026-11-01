@@ -1,6 +1,5 @@
 appId: com.recordevolution.flockflasher
 productName: FlockFlasher
-afterSign: './scripts/notarize.js'
 directories:
   buildResources: build
 files:
@@ -8,7 +7,7 @@ files:
   - '!src/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
-  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  - '!{.env,.env.*,electron-builder.env,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
@@ -39,7 +38,11 @@ mac:
     - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
-  notarize: false
+  # electron-builder's own notarization (notarytool), with APPLE_ID,
+  # APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID from the environment (CI: the
+  # `release` environment; locally: electron-builder.env). An unsigned build
+  # never gets here; a signed one without those variables skips it with a warning.
+  notarize: true
   publish:
     provider: github
     owner: IronFlock
@@ -76,7 +79,7 @@ fileAssociations:
     icon: src/assets/icons/icon.icns
     mimeType: text/x-reswarm
     role: Viewer
-electronVersion: 43.1.0 # Version
+electronVersion: 43.8.4 # keep equal to package.json `electron`
 # NOTE: auto-update publishing is configured per-target (github) in the win/mac/linux
 # blocks above. There is intentionally no top-level generic publish block: the old
 # `https://example.com/auto-updates` placeholder pointed updates at a domain the

@@ -1,0 +1,115 @@
+# The package build of the runner's OS: Node from .nvmrc, `npm ci`, then the
+# Justfile's `package` recipes one by one (`just natives`, `just build`,
+# `just installer`), and the installer, its blockmaps and latest*.yml as the
+# artifact dist-<os>. release.yml's `build` (unsigned: Linux, Windows and the
+# dry run's macOS) and `build-mac` (signed and notarized) both use it, so a dry
+# run builds what a release builds.
+#
+# The signing inputs reach the installer step only: npm's install scripts and
+# the native builds never see them.
+#
+# workflows-lint (actionlint, zizmor, pinact) scans .github/workflows only:
+# keep the pins below on the same commits as the workflows by hand.
+name: package
+description: Build the FlockFlasher installer of the runner's OS into the artifact dist-<os>.
+
+inputs:
+  sign:
+    description: '"true": sign (and on macOS notarize); every signing input below is then required.'
+    default: "false"
+  csc-link:
+    description: The Developer ID Application certificate with its key (.p12, base64).
+    default: ""
+  csc-key-password:
+    description: The password of csc-link.
+    default: ""
+  apple-id:
+    description: The Apple ID that notarizes.
+    default: ""
+  apple-app-specific-password:
+    description: An app-specific password of apple-id.
+    default: ""
+  apple-team-id:
+    description: The Apple developer team of the certificate.
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version-file: .nvmrc
+        # No cache: a release takes nothing from a cache another workflow wrote.
+        package-manager-cache: false
+    - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+      with:
+        just-version: "1.59.0"
+
+    # CI is set, so postinstall skips the packaging steps: `just natives` runs them.
+    - name: npm ci
+      shell: bash
+      run: npm ci --no-audit --no-fund
+    - name: just natives
+      shell: bash
+      run: just natives
+    # An optional dependency: npm carries on when its native build fails, and the
+    # installer would then ship without the Windows USB driver support.
+    - name: winusb-driver-generator is built
+      if: runner.os == 'Windows'
+      shell: bash
+      run: |
+        ls node_modules/winusb-driver-generator/build/Release/*.node ||
+          { echo "::error::winusb-driver-generator has no native build"; exit 1; }
+    - name: just build
+      shell: bash
+      run: just build
+
+    - name: signing inputs are set
+      if: inputs.sign == 'true'
+      shell: bash
+      env:
+        CSC_LINK: ${{ inputs.csc-link }}
+        CSC_KEY_PASSWORD: ${{ inputs.csc-key-password }}
+        APPLE_ID: ${{ inputs.apple-id }}
+        APPLE_APP_SPECIFIC_PASSWORD: ${{ inputs.apple-app-specific-password }}
+        APPLE_TEAM_ID: ${{ inputs.apple-team-id }}
+      run: |
+        missing=""
+        for v in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+          [ -n "${!v}" ] || missing="$missing $v"
+        done
+        if [ -n "$missing" ]; then
+          echo "::error::signing needs the secrets of the release environment:$missing"
+          exit 1
+        fi
+    # electron-builder takes an empty CSC_LINK for a certificate: unset what is empty.
+    - name: just installer
+      shell: bash
+      env:
+        CSC_IDENTITY_AUTO_DISCOVERY: ${{ inputs.sign }}
+        CSC_LINK: ${{ inputs.csc-link }}
+        CSC_KEY_PASSWORD: ${{ inputs.csc-key-password }}
+        APPLE_ID: ${{ inputs.apple-id }}
+        APPLE_APP_SPECIFIC_PASSWORD: ${{ inputs.apple-app-specific-password }}
+        APPLE_TEAM_ID: ${{ inputs.apple-team-id }}
+      run: |
+        for v in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+          [ -n "${!v}" ] || unset "$v"
+        done
+        just installer
+
+    # overwrite: artifacts belong to the run, so a re-run of every job would
+    # otherwise fail on the name an earlier attempt uploaded.
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: dist-${{ runner.os }}
+        path: |
+          dist/*.exe
+          dist/*.dmg
+          dist/*.zip
+          dist/*.AppImage
+          dist/*.blockmap
+          dist/latest*.yml
+        if-no-files-found: error
+        overwrite: true
+        retention-days: 7

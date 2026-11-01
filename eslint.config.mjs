@@ -44,7 +44,7 @@ export default tseslint.config(
     }
   },
   {
-    // CommonJS build/notarize scripts legitimately use require().
+    // CommonJS build scripts legitimately use require().
     files: ['scripts/**/*.js', '**/*.cjs'],
     rules: {
       '@typescript-eslint/no-require-imports': 'off'

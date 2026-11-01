@@ -48,9 +48,10 @@ for (const mod of NAN_MODULES) {
       stdio: 'inherit',
       env: {
         ...process.env,
-        // Node 22's V8 headers require C++17 (std::is_void_v etc.); Electron's build
-        // sets this for us, a bare node-gyp build does not.
-        CXXFLAGS: `${process.env.CXXFLAGS ?? ''} -std=c++17`.trim()
+        // The bundled Node's V8 headers set the C++ standard: Node 24 requires C++20
+        // (concepts, std::ranges; v8config.h: "C++20 or later required"). Electron's
+        // build sets this for us, a bare node-gyp build does not. MSVC ignores CXXFLAGS.
+        CXXFLAGS: `${process.env.CXXFLAGS ?? ''} -std=c++20`.trim()
       }
     }
   )

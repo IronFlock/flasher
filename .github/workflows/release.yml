@@ -1,10 +1,34 @@
 # Release: the merge of a release pull request (`just release-patch`: version
-# bump, title `release flockflasher v<version>`) sets the tag v<version> on the
-# merged commit. The artifacts are then built, notarized and published per
-# operating system with `just release` from that tag (see the Justfile).
-# A no-release merge starts nothing: `paths` holds only the version file, and
-# when a no-release pull request touches it anyway (a dependency) the job
-# below is skipped by its merge title, so no runner starts.
+# bump, title `release flockflasher v<version>`) builds the installers of every
+# operating system, publishes them as the GitHub Release v<version> (with the
+# latest*.yml files the in-app updater reads) and sets the tag v<version> on
+# the merged commit.
+#
+# The order keeps "a tag always means released", and the updater never sees a
+# half-uploaded release:
+#   verify     the harness's release.sh mode: release, released (a re-run
+#              after the tag: nothing is rebuilt) or dry-run
+#   build      the Linux and Windows installers, unsigned (and macOS on a dry run)
+#   build-mac  the macOS installer, signed and notarized (release only)
+#   publish    a DRAFT GitHub Release with every installer (the updater does not
+#              see drafts)
+#   tag        v<version>, set by the release GitHub App (release-tag.yml)
+#   finalize   the draft becomes the published, latest release
+# The Apple credentials and the release App's key are secrets of the `release`
+# environment (deployments from main only). Every write to GitHub uses the
+# App's token; GITHUB_TOKEN stays read-only. The Windows installer is unsigned:
+# Windows SmartScreen warns on its first start, and the updater checks no
+# signature (no publisherName).
+#
+# ci.yml calls this workflow on release pull requests (workflow_call), and a
+# manual run (workflow_dispatch) only builds: a dry run builds every installer
+# unsigned and publishes nothing. A no-release merge starts nothing: `paths`
+# holds only the version file, and when a no-release pull request touches it
+# anyway (a dependency) `verify` is skipped by its merge title.
+#
+# A failed release run: re-run it; publish replaces the draft's files, and tag
+# and finalize pass when their work is done. A version given up after publish
+# leaves a draft behind: `gh release delete v<version> --yes`.
 name: release
 
 on:
@@ -21,17 +45,216 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
-  # Only on the merge of a release pull request. Written with the release
-  # GitHub App's token from the `release` environment (deployments from main
-  # only).
+  verify:
+    # A no-release merge that touches package.json anyway: no runner.
+    if: github.event_name != 'push' || startsWith(github.event.head_commit.message, 'release ')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      mode: ${{ steps.mode.outputs.mode }}
+      tag: ${{ steps.mode.outputs.tag }}
+      runners: ${{ steps.runners.outputs.json }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: IronFlock/workflows
+          ref: v1
+          path: .harness
+          persist-credentials: false
+          sparse-checkout: scripts
+          sparse-checkout-cone-mode: false
+      - name: what this run releases
+        id: mode
+        env:
+          VERSION_FILE: package.json
+          TAG_PREFIX: v
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          RELEASE_BRANCH: main
+          COMMIT_TITLE: ${{ github.event.head_commit.message }}
+          SHA: ${{ github.sha }}
+        run: |
+          mv .harness "$RUNNER_TEMP/harness"
+          "$RUNNER_TEMP/harness/scripts/release.sh" mode
+      # Linux builds on the oldest Ubuntu runner: the native modules link
+      # against the build host's glibc, and a build on Ubuntu 24.04 would not
+      # load on 22.04. macOS builds in build-mac on a release (signed), here
+      # unsigned on a dry run.
+      - name: build runners
+        id: runners
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
+        run: |
+          runners='"ubuntu-22.04","windows-latest"'
+          if [ "$MODE" != release ]; then runners="$runners,\"macos-latest\""; fi
+          echo "json=[$runners]" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: build ${{ matrix.runner }}
+    needs: verify
+    if: needs.verify.outputs.mode != 'released'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: ${{ fromJSON(needs.verify.outputs.runners) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/package
+
+  build-mac:
+    name: build macos-latest (signed, notarized)
+    needs: verify
+    if: needs.verify.outputs.mode == 'release'
+    runs-on: macos-latest
+    timeout-minutes: 90
+    environment: release
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/package
+        with:
+          sign: "true"
+          csc-link: ${{ secrets.CSC_LINK }}
+          csc-key-password: ${{ secrets.CSC_KEY_PASSWORD }}
+          apple-id: ${{ secrets.APPLE_ID }}
+          apple-app-specific-password: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          # The certificate's developer team; public, it is in every signature.
+          apple-team-id: 9D2S7J8B4D
+
+  publish:
+    name: draft GitHub release
+    needs: [verify, build, build-mac]
+    if: >-
+      !cancelled() && needs.verify.outputs.mode == 'release' && needs.build.result == 'success' &&
+      needs.build-mac.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: release
+    permissions:
+      contents: read
+    # No checkout: gh takes the repository from GH_REPO.
+    env:
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.verify.outputs.tag }}
+    steps:
+      - name: collect the installers
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          pattern: dist-*
+          merge-multiple: true
+      - name: every updater file, of this version, with the files it names
+        run: |
+          ls -l dist
+          for y in latest.yml latest-mac.yml latest-linux.yml; do
+            [ -f "dist/$y" ] || { echo "::error::dist/$y is missing"; exit 1; }
+            grep -qx "version: ${TAG#v}" "dist/$y" || { echo "::error::dist/$y is not version ${TAG#v}"; exit 1; }
+            sed -n 's/^ *- url: //p' "dist/$y" | while read -r f; do
+              [ -f "dist/$f" ] || { echo "::error::dist/$y names $f, which is missing"; exit 1; }
+            done
+          done
+      - name: release App token (contents of this repository)
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+      - name: draft release ${{ needs.verify.outputs.tag }}
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          state=$(gh release list --limit 100 --json tagName,isDraft |
+            jq -r --arg tag "$TAG" '.[] | select(.tagName == $tag) | if .isDraft then "draft" else "published" end')
+          case "$state" in
+            "")
+              gh release create "$TAG" --draft --target "$SHA" --title "$TAG" --generate-notes dist/* ;;
+            draft)
+              echo "the draft release $TAG exists: replacing its files"
+              gh release upload "$TAG" --clobber dist/* ;;
+            *)
+              echo "::error::the release $TAG is published, but its tag is not set"
+              exit 1 ;;
+          esac
+
+  # The tag once every installer is in the draft release; only on the merge of
+  # a release pull request. Written with the release GitHub App's token from
+  # the `release` environment.
   tag:
-    if: github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release ')
+    needs: [verify, publish]
+    if: >-
+      !cancelled() && needs.verify.outputs.mode == 'release' && needs.publish.result == 'success'
     uses: IronFlock/workflows/.github/workflows/release-tag.yml@v1
     permissions:
       contents: read
     # The App key is a secret of the `release` environment; environment
     # secrets reach a reusable workflow only through `secrets: inherit`.
+    # No github-release: it would publish a release before its files exist.
     secrets: inherit # zizmor: ignore[secrets-inherit] # nosemgrep: yaml.github-actions.security.secrets-inherit.secrets-inherit
     with:
       version-file: package.json
+
+  finalize:
+    name: publish GitHub release
+    needs: [verify, tag]
+    # `released` (a re-run after the tag): the tag job is skipped, and the
+    # draft is published if an earlier attempt stopped short of it.
+    if: >-
+      !cancelled() && (needs.verify.outputs.mode == 'released' ||
+      (needs.verify.outputs.mode == 'release' && needs.tag.result == 'success'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: release
+    permissions:
+      contents: read
+    env:
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.verify.outputs.tag }}
+    steps:
+      - name: release App token (contents of this repository)
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+      - name: publish release ${{ needs.verify.outputs.tag }}
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          state=$(gh release list --limit 100 --json tagName,isDraft |
+            jq -r --arg tag "$TAG" '.[] | select(.tagName == $tag) | if .isDraft then "draft" else "published" end')
+          case "$state" in
+            draft)
+              gh release edit "$TAG" --draft=false --latest ;;
+            published)
+              echo "the release $TAG is already published" ;;
+            *)
+              echo "::error::there is no GitHub release $TAG"
+              exit 1 ;;
+          esac
