@@ -49,18 +49,9 @@ runs:
     - name: npm ci
       shell: bash
       run: npm ci --no-audit --no-fund
-    # Linux: GCC 11 rejects the V8 headers of Electron 43 and Node 24 (a class head
-    # with a [[deprecated]] attribute before a GNU visibility attribute), so on a
-    # runner whose default gcc is older than 12 (ubuntu-22.04: 11) the natives
-    # build with the g++-12 installed beside it.
     - name: just natives
       shell: bash
-      run: |
-        if [ "$RUNNER_OS" = Linux ] && [ "$(gcc -dumpversion | cut -d. -f1)" -lt 12 ]; then
-          export CC=gcc-12 CXX=g++-12
-          "$CXX" --version | head -n 1
-        fi
-        just natives
+      run: just natives
     # An optional dependency: npm carries on when its native build fails, and the
     # installer would then ship without the Windows USB driver support.
     - name: winusb-driver-generator is built

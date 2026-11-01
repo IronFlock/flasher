@@ -141,6 +141,7 @@ needs a complete Command Line Tools install. If it fails with `'functional'`/`'c
 found`, the CLT is missing its C++ stdlib headers — reinstall it:
 `sudo rm -rf /Library/Developer/CommandLineTools && sudo xcode-select --install`.
 
-On Linux they need GCC 12 or newer: GCC 11 (the default of Ubuntu 22.04) fails on the V8 headers
-with `expected identifier before '__attribute__'`. Install `g++-12` and build with
-`CC=gcc-12 CXX=g++-12 npm install`. The release build does this on its Ubuntu 22.04 runner.
+On Linux, GCC fails on Electron 43's V8 headers with `expected identifier before '__attribute__'`
+when deprecation warnings are on, which node-gyp turns on for every addon.
+`scripts/prepare-natives.js` turns them off for the Electron build on Linux, so a plain
+`npm install` works there.

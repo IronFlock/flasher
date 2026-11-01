@@ -8,11 +8,26 @@
 const path = require('path')
 const { execFileSync } = require('child_process')
 
-const run = (...args) =>
-  execFileSync(process.execPath, args, { stdio: 'inherit', cwd: path.join(__dirname, '..') })
+const run = (args, env = process.env) =>
+  execFileSync(process.execPath, args, { stdio: 'inherit', cwd: path.join(__dirname, '..'), env })
 
-run(path.join(__dirname, 'fetch-node.js'))
+// Linux: node-gyp builds every addon with USING_V8_SHARED and V8_DEPRECATION_WARNINGS
+// (its addon.gypi). Electron 43's V8 headers then declare a deprecated class as
+// `class [[deprecated(...)]] __attribute__((visibility("default"))) Value`
+// (v8-primitive.h), an attribute order GCC rejects ("expected identifier before
+// '__attribute__'"; clang accepts it). gyp puts CPPFLAGS after its own defines, so
+// undefining the warning macros there drops the deprecation warnings and nothing else.
+const electronEnv =
+  process.platform === 'linux'
+    ? {
+        ...process.env,
+        CPPFLAGS:
+          `${process.env.CPPFLAGS ?? ''} -UV8_DEPRECATION_WARNINGS -UV8_IMMINENT_DEPRECATION_WARNINGS`.trim()
+      }
+    : process.env
+
+run([path.join(__dirname, 'fetch-node.js')])
 // The CLI's JS entry, not the node_modules/.bin shim: it runs the same on every
 // platform and outside npm's PATH (see rebuild-flash-natives.js).
-run(require.resolve('electron-builder/cli.js'), 'install-app-deps')
-run(path.join(__dirname, 'rebuild-flash-natives.js'))
+run([require.resolve('electron-builder/cli.js'), 'install-app-deps'], electronEnv)
+run([path.join(__dirname, 'rebuild-flash-natives.js')])
