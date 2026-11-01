@@ -8,56 +8,56 @@ All you need to debug the application is:
 
 `main` takes changes only through pull requests whose checks are green. `just release-patch`
 (or `-minor`, `-major`) on a feature branch bumps the version in `package.json` and
-`package-lock.json`, opens the release pull request and waits for its merge; the merge sets the
-tag `v<version>`. Changes that release nothing go in with `just merge`.
+`package-lock.json`, opens the release pull request and waits for its merge. Changes that release
+nothing go in with `just merge`.
 
-Then, on every machine that you wish to create a version on (macOS first, it notarizes), check out
-that tag (`git fetch --tags && git switch --detach v<version>`) and run `just release`. It uses
-`GH_TOKEN` from the environment or `.env`, else your `gh` login.
+The release pull request also builds the installers of every OS as a dry run (unsigned, nothing
+published), so a broken build never reaches `main`. Its merge runs
+[`release.yml`](.github/workflows/release.yml) on GitHub Actions:
 
-The machine itself should do the rest.
+1. The installers are built on one runner per OS: Windows and Linux unsigned, macOS (arm64) signed
+   with the Developer ID certificate and notarized.
+2. They are uploaded, with the `latest*.yml` files the in-app updater reads, to a **draft**
+   [GitHub Release](https://github.com/IronFlock/flasher/releases). The updater does not see drafts.
+3. The tag `v<version>` is set, and the draft becomes the published, latest release.
 
-On Github, it should automatically create a release entry in the list with the latest version string.
+Nothing is built or published from a laptop. A failed release run is re-run from the Actions tab.
+A version given up after step 2 leaves a draft behind: delete it with
+`gh release delete v<version> --yes`.
 
-[Releases](https://github.com/IronFlock/flasher/releases)
+`just package` builds the installer of your own OS into `dist/` the same way, without publishing.
+A local macOS build signs with a Developer ID certificate in your keychain, if there is one. It
+notarizes when a git-ignored `electron-builder.env` file sets `APPLE_ID`,
+`APPLE_APP_SPECIFIC_PASSWORD` (an [app-specific password](https://support.apple.com/en-us/102654))
+and `APPLE_TEAM_ID`.
 
-Before putting the release public, make sure that all releases have been pushed for all devices.
+### Windows installers are unsigned
 
-### MacOS  - ! IMPORTANT !
+The Windows installer carries no code signature. On first start, Windows SmartScreen shows
+"Windows protected your PC": choose **More info**, then **Run anyway**. Auto-updates work without a
+signature, because the installed app has no publisher name to check updates against.
 
-The electron builder release system currently does NOT support automatically combining the `latest-mac.yml` files when releasing the amd64 AND arm versions.
+### One-time setup of the release secrets
 
-In other words, you have to manually stitch both files together as follows:
+The repository's `release` environment (deployments from `main` only) holds the release GitHub
+App's key (`RELEASE_APP_PRIVATE_KEY`, variable `RELEASE_APP_CLIENT_ID`) and the Apple credentials:
 
+```bash
+# Keychain Access, login keychain, My Certificates: right-click
+# "Developer ID Application: Record Evolution GmbH (9D2S7J8B4D)", Export, format .p12, save as
+# ~/Desktop/DeveloperID.p12 and give it a password.
+p12=~/Desktop/DeveloperID.p12
+test -s "$p12" && base64 -i "$p12" | gh secret set CSC_LINK -R IronFlock/flasher -e release \
+  || echo "$p12 not found, CSC_LINK not set"
+gh secret set CSC_KEY_PASSWORD -R IronFlock/flasher -e release              # the .p12 password
+gh secret set APPLE_ID -R IronFlock/flasher -e release                      # Apple ID e-mail
+gh secret set APPLE_APP_SPECIFIC_PASSWORD -R IronFlock/flasher -e release
+rm "$p12"
 ```
-version: 2.0.3
-files:
-  - url: FlockFlasher-2.0.3-mac.zip
-    sha512: pfNijx9AZuFEzN7/UTDhoKlKeG72A+c3EdGoBE+X6fyn7nO1ZO8McNcZFaExbO0RhN+svnqF6JrWPenIKEfdSQ==
-    size: 133448877
-  - url: FlockFlasher-2.0.3-arm64-mac.zip
-    sha512: 8XOTrqvnGfmM1V9MAivyQ9BPbWyqtkTQ16pZAzSCRUwgLTtRswJZJ0cHIqYw1+6+yRWFdIgQXt1cu6YWkUpWzg==
-    size: 128751915
-  - url: flockflasher-x64.dmg
-    sha512: b9XzDuF/+c3JCA/LLFciLUqyOw12xHmh0vZkZpvS6V8GCzFmz1maEXOkBYAYv9YQLcxhGaM0aMMVuQNiWHgjGg==
-    size: 138481744
-  - url: flockflasher-arm64.dmg
-    sha512: jFZIxhz615EI2autjm4wnKOLGZchSKNOd3zmlRMFXdQjFEIZz6C8szgzjlYyzCfYH5hPOc+EQgbDVPIOla3Zew==
-    size: 133845710
-path: FlockFlasher-2.0.3-mac.zip
-sha512: pfNijx9AZuFEzN7/UTDhoKlKeG72A+c3EdGoBE+X6fyn7nO1ZO8McNcZFaExbO0RhN+svnqF6JrWPenIKEfdSQ==
-releaseDate: '2024-01-10T13:54:20.948Z'
-```
 
-#### Notarization
+`gh secret list -R IronFlock/flasher -e release` shows the names and dates, never the values.
 
-In order to notarize the app for MacOS, you need to have the correct keys installed (see specific laptops).
-
-After that, you need to supply a .env file which includes the correct `APPLEID` and `APPLEIDPASS` variables.
-
-The APPLEID would be the email you use to login, and the APPLEIDPASS is the app-specific password that you can generate on your account. ([How to](https://support.apple.com/en-us/102654))
-
-After that, the `npm run release` process will automatically notarize the app for you.
+The Apple team ID is not a secret and is set in `release.yml`.
 
 ## EtcherSDK
 
@@ -84,21 +84,9 @@ Since we spawn a subprocess, we need to be able to read back the flashing progre
 
 ### Windows
 
-In order to access the USB drives in Windows, the `etcher-sdk` must include the `winusb-driver-generator` package. When running the `npm i` command on Windows, it will automatically and temporarily add this package using the `scripts/windows.js` script.
+In order to access the USB drives in Windows, the `etcher-sdk` must include the `winusb-driver-generator` package. It is an optional dependency limited to Windows, so `npm install` adds it on Windows only.
 
-In order for Gulp to be able to build FlockFlasher on Windows, it must compile the underlying winusb driver.
-
-Before you can do this, you must have the [Windows Driver Kit](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk) (WDK) installed. This can also be installed as a component during the Visual Studio installation process.
-
-I 
-
-There's a known issue where the `WDF redistributable co-installers don't work`, which is required in order to build the windows usb driver. Solutions can be found [here](https://learn.microsoft.com/en-us/windows-hardware/drivers/wdk-known-issues).
-
-Install python and the Visual Studio Build Tools as well. Install `pip install setuptools`. Also I ended up finding and copying two files into this path:
-C:\Program Files (x86)\Windows Kits\10\Redist\wdf\x64
-
-WdfCoInstaller01011.dll
-winusbcoinstaller2.dll
+Its native module compiles during `npm install`, which needs Python and the Visual Studio Build Tools (the GitHub-hosted Windows runner has both). The package bundles the WDK co-installer files it needs. npm does not fail when an optional dependency fails to build, so check that `node_modules/winusb-driver-generator/build/Release` holds a `.node` file; the release build fails without one.
 
 
 ### AppImages (Linux)
@@ -152,3 +140,8 @@ The native modules (`drivelist`, `mountutils`) compile from source on macOS, so 
 needs a complete Command Line Tools install. If it fails with `'functional'`/`'cstdlib' file not
 found`, the CLT is missing its C++ stdlib headers — reinstall it:
 `sudo rm -rf /Library/Developer/CommandLineTools && sudo xcode-select --install`.
+
+On Linux, GCC fails on Electron 43's V8 headers with `expected identifier before '__attribute__'`
+when deprecation warnings are on, which node-gyp turns on for every addon.
+`scripts/prepare-natives.js` turns them off for the Electron build on Linux. The `usb` module
+also needs the udev headers: `sudo apt-get install libudev-dev`.

@@ -1,8 +1,10 @@
 # Gate (eslint and type checks, Vitest, the app bundle) and workflow lint from
-# the shared IronFlock CI harness. The packaging steps of the install
-# (scripts/postinstall.js) are skipped in CI.
+# the shared IronFlock CI harness. The gate skips the packaging steps of the
+# install (scripts/postinstall.js); release-build runs them.
 # Pull requests into main only: the ruleset lets nothing reach main without
-# ci-ok. The release intent decides whether the merge releases.
+# ci-ok. The release intent decides whether the merge releases; release pull
+# requests also run release.yml as a dry run (every installer, unsigned, no
+# publish).
 name: ci
 
 on:
@@ -35,17 +37,32 @@ jobs:
     with:
       version-file: package.json
 
+  # Release pull requests only: release.yml as a dry run (the installers of
+  # every OS built, unsigned; nothing published, no tag), so a broken release
+  # build never reaches main.
+  release-build:
+    needs: [intent]
+    if: needs.intent.outputs.kind == 'release'
+    uses: ./.github/workflows/release.yml
+    permissions:
+      contents: read
+    # No secrets: a dry run neither signs nor publishes.
+
   # The required check of the main-branch ruleset: green only when every job
-  # above succeeded (skipped or cancelled counts as failed).
+  # above succeeded (skipped or cancelled counts as failed; release-build may be
+  # skipped, on a no-release pull request).
   ci-ok:
     if: ${{ always() }}
-    needs: [gate, workflows, intent]
+    needs: [gate, workflows, intent, release-build]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: all ci jobs succeeded
         env:
-          RESULTS: ${{ join(needs.*.result, ' ') }}
+          REQUIRED: ${{ needs.gate.result }} ${{ needs.workflows.result }} ${{ needs.intent.result }}
+          RELEASE_BUILD: ${{ needs.release-build.result }}
+          KIND: ${{ needs.intent.outputs.kind }}
         run: |
-          echo "results: $RESULTS"
-          for r in $RESULTS; do [ "$r" = success ] || exit 1; done
+          echo "required: $REQUIRED, release-build: $RELEASE_BUILD ($KIND)"
+          for r in $REQUIRED; do [ "$r" = success ] || exit 1; done
+          if [ "$KIND" = release ]; then [ "$RELEASE_BUILD" = success ]; else [ "$RELEASE_BUILD" = skipped ]; fi

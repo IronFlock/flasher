@@ -1,4 +1,8 @@
 .env
+# Local signing/notarization variables, read by electron-builder itself (see the Justfile)
+electron-builder.env
+# Exported signing certificates (README: one-time setup of the release secrets)
+*.p12
 node_modules
 dist
 out

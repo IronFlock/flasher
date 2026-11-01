@@ -1,6 +1,6 @@
 {
   "name": "flockflasher",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "description": "An efficient, modern and reliable flashing tool for IoT applications",
   "author": "Record Evolution GmbH",
   "publisher": "Record Evolution GmbH",
@@ -19,11 +19,7 @@
     "postinstall": "node scripts/postinstall.js",
     "dev": "electron-vite dev",
     "dev:debug": "electron-vite dev --inspect",
-    "release": "electron-builder",
-    "build": "npm run typecheck && electron-vite build",
-    "build:win": "npm run build && electron-builder --win --config",
-    "build:macm1": "npm run build && electron-builder --mac --config",
-    "build:linux": "npm run build && electron-builder --linux --config"
+    "build": "npm run typecheck && electron-vite build"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
@@ -58,7 +54,6 @@
     "@electron-toolkit/eslint-config": "^2.1.0",
     "@electron-toolkit/eslint-config-ts": "^3.1.0",
     "@electron-toolkit/tsconfig": "^2.0.0",
-    "@electron/notarize": "^3.1.1",
     "@electron/rebuild": "^4.2.0",
     "@swc/core": "^1.15.43",
     "@types/lodash": "^4.17.20",
