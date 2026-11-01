@@ -140,3 +140,7 @@ The native modules (`drivelist`, `mountutils`) compile from source on macOS, so 
 needs a complete Command Line Tools install. If it fails with `'functional'`/`'cstdlib' file not
 found`, the CLT is missing its C++ stdlib headers — reinstall it:
 `sudo rm -rf /Library/Developer/CommandLineTools && sudo xcode-select --install`.
+
+On Linux they need GCC 12 or newer: GCC 11 (the default of Ubuntu 22.04) fails on the V8 headers
+with `expected identifier before '__attribute__'`. Install `g++-12` and build with
+`CC=gcc-12 CXX=g++-12 npm install`. The release build does this on its Ubuntu 22.04 runner.
