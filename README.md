@@ -11,12 +11,11 @@ All you need to debug the application is:
 `package-lock.json`, opens the release pull request and waits for its merge. Changes that release
 nothing go in with `just merge`.
 
-The release pull request also builds the installers of every OS as a dry run (unsigned, nothing
+The release pull request also builds the Linux and Windows installers as a dry run (nothing
 published), so a broken build never reaches `main`. Its merge runs
 [`release.yml`](.github/workflows/release.yml) on GitHub Actions:
 
-1. The installers are built on one runner per OS: Windows and Linux unsigned, macOS (arm64) signed
-   with the Developer ID certificate and notarized.
+1. The Linux and Windows installers are built, one runner each, unsigned.
 2. They are uploaded, with the `latest*.yml` files the in-app updater reads, to a **draft**
    [GitHub Release](https://github.com/IronFlock/flasher/releases). The updater does not see drafts.
 3. The tag `v<version>` is set, and the draft becomes the published, latest release.
@@ -26,10 +25,13 @@ A version given up after step 2 leaves a draft behind: delete it with
 `gh release delete v<version> --yes`.
 
 `just package` builds the installer of your own OS into `dist/` the same way, without publishing.
-A local macOS build signs with a Developer ID certificate in your keychain, if there is one. It
-notarizes when a git-ignored `electron-builder.env` file sets `APPLE_ID`,
-`APPLE_APP_SPECIFIC_PASSWORD` (an [app-specific password](https://support.apple.com/en-us/102654))
-and `APPLE_TEAM_ID`.
+
+### macOS is not released
+
+macOS blocks apps that Apple has not notarized, and notarization needs a membership in the Apple
+Developer Program, which has ended. Releases therefore hold no macOS installer. Installed Mac apps
+stay on v2.1.2: their updater finds no `latest-mac.yml` in a newer release and offers nothing. On a
+Mac, `just package` still builds an app for local use.
 
 ### Windows installers are unsigned
 
@@ -37,27 +39,12 @@ The Windows installer carries no code signature. On first start, Windows SmartSc
 "Windows protected your PC": choose **More info**, then **Run anyway**. Auto-updates work without a
 signature, because the installed app has no publisher name to check updates against.
 
-### One-time setup of the release secrets
+### Release secrets
 
 The repository's `release` environment (deployments from `main` only) holds the release GitHub
-App's key (`RELEASE_APP_PRIVATE_KEY`, variable `RELEASE_APP_CLIENT_ID`) and the Apple credentials:
-
-```bash
-# Keychain Access, login keychain, My Certificates: right-click
-# "Developer ID Application: Record Evolution GmbH (9D2S7J8B4D)", Export, format .p12, save as
-# ~/Desktop/DeveloperID.p12 and give it a password.
-p12=~/Desktop/DeveloperID.p12
-test -s "$p12" && base64 -i "$p12" | gh secret set CSC_LINK -R IronFlock/flasher -e release \
-  || echo "$p12 not found, CSC_LINK not set"
-gh secret set CSC_KEY_PASSWORD -R IronFlock/flasher -e release              # the .p12 password
-gh secret set APPLE_ID -R IronFlock/flasher -e release                      # Apple ID e-mail
-gh secret set APPLE_APP_SPECIFIC_PASSWORD -R IronFlock/flasher -e release
-rm "$p12"
-```
-
-`gh secret list -R IronFlock/flasher -e release` shows the names and dates, never the values.
-
-The Apple team ID is not a secret and is set in `release.yml`.
+App's key, `RELEASE_APP_PRIVATE_KEY`, and its variable `RELEASE_APP_CLIENT_ID`. The release needs
+nothing else. `gh secret list -R IronFlock/flasher -e release` shows the names and dates, never the
+values.
 
 ## EtcherSDK
 
