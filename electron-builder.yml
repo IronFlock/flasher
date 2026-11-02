@@ -38,11 +38,9 @@ mac:
     - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
-  # electron-builder's own notarization (notarytool), with APPLE_ID,
-  # APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID from the environment (CI: the
-  # `release` environment; locally: electron-builder.env). An unsigned build
-  # never gets here; a signed one without those variables skips it with a warning.
-  notarize: true
+  # macOS is not released: notarization needs a membership in the Apple
+  # Developer Program, which has ended. A Mac build is for local use only.
+  notarize: false
   publish:
     provider: github
     owner: IronFlock

@@ -1,28 +1,31 @@
 # Release: the merge of a release pull request (`just release-patch`: version
-# bump, title `release flockflasher v<version>`) builds the installers of every
-# operating system, publishes them as the GitHub Release v<version> (with the
+# bump, title `release flockflasher v<version>`) builds the Linux and Windows
+# installers, publishes them as the GitHub Release v<version> (with the
 # latest*.yml files the in-app updater reads) and sets the tag v<version> on
 # the merged commit.
+#
+# macOS is not released: notarization needs a membership in the Apple Developer
+# Program, which has ended. Installed Mac apps stay on v2.1.2: their updater
+# finds no latest-mac.yml in a newer release and offers nothing. `just package`
+# on a Mac still builds an unsigned app for local use.
 #
 # The order keeps "a tag always means released", and the updater never sees a
 # half-uploaded release:
 #   verify     the harness's release.sh mode: release, released (a re-run
 #              after the tag: nothing is rebuilt) or dry-run
-#   build      the Linux and Windows installers, unsigned (and macOS on a dry run)
-#   build-mac  the macOS installer, signed and notarized (release only)
+#   build      the Linux and Windows installers, unsigned
 #   publish    a DRAFT GitHub Release with every installer (the updater does not
 #              see drafts)
 #   tag        v<version>, set by the release GitHub App (release-tag.yml)
 #   finalize   the draft becomes the published, latest release
-# The Apple credentials and the release App's key are secrets of the `release`
-# environment (deployments from main only). Every write to GitHub uses the
-# App's token; GITHUB_TOKEN stays read-only. The Windows installer is unsigned:
-# Windows SmartScreen warns on its first start, and the updater checks no
-# signature (no publisherName).
+# The release App's key is a secret of the `release` environment (deployments
+# from main only). Every write to GitHub uses the App's token; GITHUB_TOKEN
+# stays read-only. The Windows installer is unsigned: Windows SmartScreen warns
+# on its first start, and the updater checks no signature (no publisherName).
 #
 # ci.yml calls this workflow on release pull requests (workflow_call), and a
-# manual run (workflow_dispatch) only builds: a dry run builds every installer
-# unsigned and publishes nothing. A no-release merge starts nothing: `paths`
+# manual run (workflow_dispatch) only builds: a dry run builds the installers
+# and publishes nothing. A no-release merge starts nothing: `paths`
 # holds only the version file, and when a no-release pull request touches it
 # anyway (a dependency) `verify` is skipped by its merge title.
 #
@@ -60,7 +63,6 @@ jobs:
     outputs:
       mode: ${{ steps.mode.outputs.mode }}
       tag: ${{ steps.mode.outputs.tag }}
-      runners: ${{ steps.runners.outputs.json }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -89,18 +91,6 @@ jobs:
         run: |
           mv .harness "$RUNNER_TEMP/harness"
           "$RUNNER_TEMP/harness/scripts/release.sh" mode
-      # Linux builds on the oldest Ubuntu runner: the native modules link
-      # against the build host's glibc, and a build on Ubuntu 24.04 would not
-      # load on 22.04. macOS builds in build-mac on a release (signed), here
-      # unsigned on a dry run.
-      - name: build runners
-        id: runners
-        env:
-          MODE: ${{ steps.mode.outputs.mode }}
-        run: |
-          runners='"ubuntu-22.04","windows-latest"'
-          if [ "$MODE" != release ]; then runners="$runners,\"macos-latest\""; fi
-          echo "json=[$runners]" >> "$GITHUB_OUTPUT"
 
   build:
     name: build ${{ matrix.runner }}
@@ -113,42 +103,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: ${{ fromJSON(needs.verify.outputs.runners) }}
+        # Linux builds on the oldest Ubuntu runner: the native modules link
+        # against the build host's glibc, and a build on Ubuntu 24.04 would not
+        # load on 22.04.
+        runner: [ubuntu-22.04, windows-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/package
-
-  build-mac:
-    name: build macos-latest (signed, notarized)
-    needs: verify
-    if: needs.verify.outputs.mode == 'release'
-    runs-on: macos-latest
-    timeout-minutes: 90
-    environment: release
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/package
-        with:
-          sign: "true"
-          csc-link: ${{ secrets.CSC_LINK }}
-          csc-key-password: ${{ secrets.CSC_KEY_PASSWORD }}
-          apple-id: ${{ secrets.APPLE_ID }}
-          apple-app-specific-password: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          # The certificate's developer team; public, it is in every signature.
-          apple-team-id: 9D2S7J8B4D
 
   publish:
     name: draft GitHub release
-    needs: [verify, build, build-mac]
+    needs: [verify, build]
     if: >-
-      !cancelled() && needs.verify.outputs.mode == 'release' && needs.build.result == 'success' &&
-      needs.build-mac.result == 'success'
+      !cancelled() && needs.verify.outputs.mode == 'release' && needs.build.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: release
@@ -168,7 +137,7 @@ jobs:
       - name: every updater file, of this version, with the files it names
         run: |
           ls -l dist
-          for y in latest.yml latest-mac.yml latest-linux.yml; do
+          for y in latest.yml latest-linux.yml; do
             [ -f "dist/$y" ] || { echo "::error::dist/$y is missing"; exit 1; }
             grep -qx "version: ${TAG#v}" "dist/$y" || { echo "::error::dist/$y is not version ${TAG#v}"; exit 1; }
             sed -n 's/^ *- url: //p' "dist/$y" | while read -r f; do

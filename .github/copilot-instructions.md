@@ -65,15 +65,14 @@ etcher-sdk `scanner` adapters (BlockDevice, Usbboot, DriverlessDevice on Windows
 
 ## Release Process
 Releases follow the IronFlock pattern of [IronFlock/workflows](https://github.com/IronFlock/workflows): nothing is built or published from a laptop.
-1. `just release-patch` (or `-minor`/`-major`) bumps `package.json` + `package-lock.json` and opens the release PR `release flockflasher v<x>`. Its CI also runs `release.yml` as a dry run (`release-build`: every installer built unsigned, nothing published).
-2. The squash merge runs `.github/workflows/release.yml`: `verify` (harness `release.sh mode`) → `build` (Linux on `ubuntu-22.04` for the glibc floor, Windows) + `build-mac` (signed, notarized) → `publish` (a **draft** GitHub Release with the installers, blockmaps and `latest*.yml`) → `tag` (`release-tag.yml@v1`, release GitHub App) → `finalize` (draft → published, latest). Drafts are invisible to electron-updater, so clients never see a half-uploaded release.
+1. `just release-patch` (or `-minor`/`-major`) bumps `package.json` + `package-lock.json` and opens the release PR `release flockflasher v<x>`. Its CI also runs `release.yml` as a dry run (`release-build`: the Linux and Windows installers built, nothing published).
+2. The squash merge runs `.github/workflows/release.yml`: `verify` (harness `release.sh mode`) → `build` (Linux on `ubuntu-22.04` for the glibc floor, Windows; both unsigned) → `publish` (a **draft** GitHub Release with the installers, blockmaps and `latest*.yml`) → `tag` (`release-tag.yml@v1`, release GitHub App) → `finalize` (draft → published, latest). Drafts are invisible to electron-updater, so clients never see a half-uploaded release.
 3. All build steps live in `.github/actions/package` (`npm ci`, `just natives`, `just build`, `just installer`), shared by the dry run and the release.
-4. Secrets live in the repo's `release` environment (main only): `RELEASE_APP_PRIVATE_KEY` (+ var `RELEASE_APP_CLIENT_ID`), `CSC_LINK` / `CSC_KEY_PASSWORD` (Developer ID .p12, base64), `APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD`. `GITHUB_TOKEN` stays read-only; every GitHub write uses the App token.
+4. The only secret is the release App's key in the repo's `release` environment (main only): `RELEASE_APP_PRIVATE_KEY` (+ var `RELEASE_APP_CLIENT_ID`). `GITHUB_TOKEN` stays read-only; every GitHub write uses the App token.
 5. A failed run is re-run; a version abandoned after `publish` leaves a draft to delete (`gh release delete v<x> --yes`).
 
 ### macOS
-- arm64 only (the x64 build was dropped), so `latest-mac.yml` needs no stitching.
-- electron-builder's built-in notarization (`mac.notarize: true`, notarytool) reads `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`. Locally, put them in the git-ignored `electron-builder.env`, which electron-builder loads itself.
+- **Not released.** Notarization needs an Apple Developer Program membership, which has ended (`mac.notarize: false`). Releases carry no `latest-mac.yml`; installed Mac apps stay on v2.1.2, whose updater ignores the resulting check error. `just package` on a Mac (arm64) builds an app for local use only.
 
 ### Windows
 - The installer is **unsigned** (no certificate): SmartScreen warns on first start, and electron-updater verifies no signature because `app-update.yml` has no `publisherName`. Adding signing later sets `publisherName`, after which every update must be signed by that publisher.

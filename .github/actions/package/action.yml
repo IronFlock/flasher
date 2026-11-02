@@ -1,37 +1,14 @@
 # The package build of the runner's OS: Node from .nvmrc, `npm ci`, then the
 # Justfile's `package` recipes one by one (`just natives`, `just build`,
-# `just installer`), and the installer, its blockmaps and latest*.yml as the
-# artifact dist-<os>. release.yml's `build` (unsigned: Linux, Windows and the
-# dry run's macOS) and `build-mac` (signed and notarized) both use it, so a dry
-# run builds what a release builds.
-#
-# The signing inputs reach the installer step only: npm's install scripts and
-# the native builds never see them.
+# `just installer`), and the installer, its blockmap and latest*.yml as the
+# artifact dist-<os>. release.yml's `build` uses it for the dry run and the
+# release alike, so a dry run builds what a release builds. Nothing is signed:
+# the Windows installer is unsigned, and macOS is not released.
 #
 # workflows-lint (actionlint, zizmor, pinact) scans .github/workflows only:
 # keep the pins below on the same commits as the workflows by hand.
 name: package
 description: Build the FlockFlasher installer of the runner's OS into the artifact dist-<os>.
-
-inputs:
-  sign:
-    description: '"true": sign (and on macOS notarize); every signing input below is then required.'
-    default: "false"
-  csc-link:
-    description: The Developer ID Application certificate with its key (.p12, base64).
-    default: ""
-  csc-key-password:
-    description: The password of csc-link.
-    default: ""
-  apple-id:
-    description: The Apple ID that notarizes.
-    default: ""
-  apple-app-specific-password:
-    description: An app-specific password of apple-id.
-    default: ""
-  apple-team-id:
-    description: The Apple developer team of the certificate.
-    default: ""
 
 runs:
   using: composite
@@ -71,40 +48,9 @@ runs:
     - name: just build
       shell: bash
       run: just build
-
-    - name: signing inputs are set
-      if: inputs.sign == 'true'
-      shell: bash
-      env:
-        CSC_LINK: ${{ inputs.csc-link }}
-        CSC_KEY_PASSWORD: ${{ inputs.csc-key-password }}
-        APPLE_ID: ${{ inputs.apple-id }}
-        APPLE_APP_SPECIFIC_PASSWORD: ${{ inputs.apple-app-specific-password }}
-        APPLE_TEAM_ID: ${{ inputs.apple-team-id }}
-      run: |
-        missing=""
-        for v in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
-          [ -n "${!v}" ] || missing="$missing $v"
-        done
-        if [ -n "$missing" ]; then
-          echo "::error::signing needs the secrets of the release environment:$missing"
-          exit 1
-        fi
-    # electron-builder takes an empty CSC_LINK for a certificate: unset what is empty.
     - name: just installer
       shell: bash
-      env:
-        CSC_IDENTITY_AUTO_DISCOVERY: ${{ inputs.sign }}
-        CSC_LINK: ${{ inputs.csc-link }}
-        CSC_KEY_PASSWORD: ${{ inputs.csc-key-password }}
-        APPLE_ID: ${{ inputs.apple-id }}
-        APPLE_APP_SPECIFIC_PASSWORD: ${{ inputs.apple-app-specific-password }}
-        APPLE_TEAM_ID: ${{ inputs.apple-team-id }}
-      run: |
-        for v in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
-          [ -n "${!v}" ] || unset "$v"
-        done
-        just installer
+      run: just installer
 
     # overwrite: artifacts belong to the run, so a re-run of every job would
     # otherwise fail on the name an earlier attempt uploaded.
@@ -113,8 +59,6 @@ runs:
         name: dist-${{ runner.os }}
         path: |
           dist/*.exe
-          dist/*.dmg
-          dist/*.zip
           dist/*.AppImage
           dist/*.blockmap
           dist/latest*.yml

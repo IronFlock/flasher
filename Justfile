@@ -8,8 +8,8 @@ VERSION_FILE := "package.json"
 # Every file _write-version changes; the release commit holds exactly these.
 VERSION_FILES := "package.json package-lock.json"
 
-# electron-builder target for the CURRENT OS. macOS builds arm64 only (the
-# amd64/x64 mac build was dropped, so latest-mac.yml names a single zip).
+# electron-builder target for the CURRENT OS. macOS builds arm64 only, for local
+# use: macOS is not released (see .github/workflows/release.yml).
 BUILDER_TARGET := if os() == "macos" { "--mac --arm64" } else if os() == "linux" { "--linux" } else { "--win" }
 
 default:
@@ -41,10 +41,7 @@ preview: build
 # Package: the installer of the CURRENT OS in dist/, never published. The
 # release workflow runs the same recipes on one runner per OS (see
 # .github/actions/package) and publishes from CI; locally this is the smoke
-# build. On macOS a local build signs with a Developer ID certificate from the
-# keychain, if there is one, and notarizes when electron-builder.env (read by
-# electron-builder itself, git-ignored) sets APPLE_ID,
-# APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID.
+# build. A macOS build is not notarized, so it is for local use only.
 # -----------------------------------------------------------------------------
 
 # Natives, app bundle and installer of the current OS into dist/ (no publish).
@@ -69,10 +66,9 @@ installer:
 #                           new branch release/v<x> from an up-to-date main)
 # Both merge automatically once ci and security are green; a release pull
 # request also builds every installer as a dry run first. The merge of a
-# release pull request runs .github/workflows/release.yml: the installers of
-# every OS are built (macOS signed and notarized), published as the GitHub
-# Release v<version>, and the tag v<version> is set. Nothing is built or
-# published from a laptop.
+# release pull request runs .github/workflows/release.yml: the Linux and
+# Windows installers are built, published as the GitHub Release v<version>,
+# and the tag v<version> is set. Nothing is built or published from a laptop.
 
 # Writes the version; called by pr.sh with the next version.
 _write-version version:

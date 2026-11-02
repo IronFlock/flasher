@@ -3,8 +3,8 @@
 # install (scripts/postinstall.js); release-build runs them.
 # Pull requests into main only: the ruleset lets nothing reach main without
 # ci-ok. The release intent decides whether the merge releases; release pull
-# requests also run release.yml as a dry run (every installer, unsigned, no
-# publish).
+# requests also run release.yml as a dry run (the Linux and Windows installers,
+# no publish).
 name: ci
 
 on:
@@ -37,16 +37,16 @@ jobs:
     with:
       version-file: package.json
 
-  # Release pull requests only: release.yml as a dry run (the installers of
-  # every OS built, unsigned; nothing published, no tag), so a broken release
-  # build never reaches main.
+  # Release pull requests only: release.yml as a dry run (the Linux and Windows
+  # installers built; nothing published, no tag), so a broken release build
+  # never reaches main.
   release-build:
     needs: [intent]
     if: needs.intent.outputs.kind == 'release'
     uses: ./.github/workflows/release.yml
     permissions:
       contents: read
-    # No secrets: a dry run neither signs nor publishes.
+    # No secrets: a dry run publishes nothing.
 
   # The required check of the main-branch ruleset: green only when every job
   # above succeeded (skipped or cancelled counts as failed; release-build may be
