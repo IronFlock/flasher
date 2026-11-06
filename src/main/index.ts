@@ -1,8 +1,10 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { setupIpcHandlers } from './ipcHandlers'
+import { sendToRenderer, setupIpcHandlers, stopDriveScanner } from './ipcHandlers'
 import { join } from 'path'
+import { setTimeout as sleep } from 'timers/promises'
 import { activeProcesses, cleanupAppImageIfExists } from './api/permissions'
+import { whenDrivelistIdle } from './api/drives'
 import { isFile, killProcessDarwin } from './utils'
 import { isConfigFileName } from '../shared/images'
 import { autoUpdater } from 'electron-updater'
@@ -23,23 +25,26 @@ const setupAutoUpdate = (mainWindow: BrowserWindow) => {
 
   page.once('did-frame-finish-load', async () => {
     autoUpdater.on('error', (err) => {
-      page.send('update-status', { error: err })
+      sendToRenderer(mainWindow, 'update-status', { error: err })
     })
 
     autoUpdater.on('checking-for-update', () => {})
     autoUpdater.on('update-available', (info) => {
       const comparison = semver.compare(info.version, version)
       if (comparison > 0) {
-        page.send('update-status', { state: 'update-available' })
+        sendToRenderer(mainWindow, 'update-status', { state: 'update-available' })
       }
     })
 
     autoUpdater.on('download-progress', (progressObj) => {
-      page.send('update-status', { state: 'update-progress', progress: progressObj })
+      sendToRenderer(mainWindow, 'update-status', {
+        state: 'update-progress',
+        progress: progressObj
+      })
     })
 
     autoUpdater.on('update-downloaded', () => {
-      page.send('update-status', { state: 'update-downloaded' })
+      sendToRenderer(mainWindow, 'update-status', { state: 'update-downloaded' })
     })
 
     autoUpdater.checkForUpdates().catch((err) => {
@@ -164,24 +169,59 @@ app.on('open-file', async (event, path) => {
   )
 })
 
-app.on('window-all-closed', async () => {
-  activeProcesses.forEach((p) => {
-    try {
-      if (process.platform === 'darwin' && p.pid) {
-        killProcessDarwin(9, p.pid) // SIGKILL
-      } else {
-        p.kill('SIGKILL')
-      }
-    } catch (error) {
-      // nullop
+// FlockFlasher is a single-window tool: closing the window quits it on every
+// platform, macOS included. Kept alive without a window, the drive scanner, the
+// agent and the updater went on sending to the destroyed window ("Object has
+// been destroyed"), and a click on the dock icon created a second window whose
+// IPC handlers were already registered.
+app.on('window-all-closed', () => {
+  app.quit()
+})
+
+// The subprocesses still running: a flash or an unmount (root, through sudo)
+// and the device agent. On macOS a root process can only be signalled through
+// sudo; without a sudo password the plain kill still reaches the agent.
+async function killActiveProcesses() {
+  const kills = [...activeProcesses].map(async (p) => {
+    if (process.platform === 'darwin' && p.pid) {
+      await killProcessDarwin(9, p.pid).catch(() => p.kill('SIGKILL'))
+    } else {
+      p.kill('SIGKILL')
     }
   })
+  await Promise.allSettled(kills)
+}
 
-  await cleanupAppImageIfExists().catch(console.error)
+const SHUTDOWN_TIMEOUT_MS = 5000
 
-  if (process.platform !== 'darwin') {
+// Runs before every quit (the window closed, Cmd+Q, quitAndInstall): stop the
+// drive scanner, kill the subprocesses, undo the AppImage mount and wait for the
+// drivelist calls still running, which abort the app if they return during the
+// teardown (api/drives.ts trackDrivelistCall). At most SHUTDOWN_TIMEOUT_MS, so a
+// hung call cannot keep the app from quitting.
+async function shutDown() {
+  stopDriveScanner()
+  const cleanup = Promise.allSettled([
+    killActiveProcesses().then(cleanupAppImageIfExists),
+    whenDrivelistIdle()
+  ])
+  const timedOut = await Promise.race([
+    cleanup.then(() => false),
+    sleep(SHUTDOWN_TIMEOUT_MS, true, { ref: false })
+  ])
+  if (timedOut) console.warn(`Quitting before the cleanup finished (${SHUTDOWN_TIMEOUT_MS} ms)`)
+}
+
+let shutdown: 'pending' | 'running' | 'done' = 'pending'
+app.on('will-quit', (event) => {
+  if (shutdown === 'done') return
+  event.preventDefault()
+  if (shutdown === 'running') return
+  shutdown = 'running'
+  shutDown().finally(() => {
+    shutdown = 'done'
     app.quit()
-  }
+  })
 })
 
 async function main() {
@@ -210,6 +250,8 @@ async function main() {
 
   const window = createWindow()
   app.on('second-instance', async (_event, argv) => {
+    // The window is gone only while the app quits.
+    if (window.isDestroyed()) return
     if (window.isMinimized()) {
       window.restore()
     }
@@ -223,12 +265,6 @@ async function main() {
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
-  })
-
-  app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 
   await handleArguments(process.argv)

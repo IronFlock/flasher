@@ -1,6 +1,12 @@
 import { BrowserWindow, OpenDialogOptions, dialog, ipcMain } from 'electron'
 import { FlashItem, RPC } from '../types'
-import { automountDrive, listDrives, listPartitions, unmountDisk } from '../main/api/drives'
+import {
+  automountDrive,
+  listDrives,
+  listPartitions,
+  trackDrivelistCall,
+  unmountDisk
+} from '../main/api/drives'
 import { scanner } from 'etcher-sdk'
 import { readFile, stat } from 'fs/promises'
 import path from 'path'
@@ -37,6 +43,14 @@ async function assertFlashableDrive(drive: Drive | undefined): Promise<Drive> {
   return match
 }
 
+// Push an event to the renderer. The scanner, the agent and the updater go on
+// emitting while the app quits, after the window has closed, and a send to a
+// destroyed window throws "Object has been destroyed" in the main process.
+export function sendToRenderer(window: BrowserWindow, channel: string, payload: unknown) {
+  if (window.isDestroyed() || window.webContents.isDestroyed()) return
+  window.webContents.send(channel, payload)
+}
+
 function handleListDrives() {
   return listDrives()
 }
@@ -56,11 +70,35 @@ function handleGetPlatform() {
   return process.platform
 }
 
+// etcher-sdk's BlockDeviceAdapter lists the drives every second, and its stop()
+// only clears a flag: a drivelist call already running goes on running. Its
+// (private) listDrives is wrapped so the quit can wait for that call as well
+// (trackDrivelistCall in api/drives.ts says why it must).
+function trackScans(adapter: scanner.adapters.BlockDeviceAdapter) {
+  const scans = adapter as unknown as { listDrives?: () => Promise<unknown> }
+  const listDrives = scans.listDrives?.bind(adapter)
+  if (!listDrives) {
+    console.error('etcher-sdk BlockDeviceAdapter has no listDrives: a quit during a scan may abort')
+    return adapter
+  }
+  scans.listDrives = () => trackDrivelistCall(listDrives())
+  return adapter
+}
+
+let deviceScanner: scanner.Scanner | undefined
+
+export function stopDriveScanner() {
+  deviceScanner?.stop()
+  deviceScanner = undefined
+}
+
 function handleDriveScanner(mainWindow: BrowserWindow) {
   const adapters: scanner.adapters.Adapter[] = [
-    new scanner.adapters.BlockDeviceAdapter({
-      includeSystemDrives: () => true
-    }),
+    trackScans(
+      new scanner.adapters.BlockDeviceAdapter({
+        includeSystemDrives: () => true
+      })
+    ),
     new scanner.adapters.UsbbootDeviceAdapter()
   ]
   if (process.platform === 'win32') {
@@ -68,20 +106,20 @@ function handleDriveScanner(mainWindow: BrowserWindow) {
       adapters.push(new scanner.adapters.DriverlessDeviceAdapter())
     }
   }
-  const deviceScanner = new scanner.Scanner(adapters)
+  deviceScanner = new scanner.Scanner(adapters)
   deviceScanner.on('attach', async (drive: scanner.adapters.AdapterSourceDestination) => {
-    mainWindow.webContents.send('drive-scanner-attach', drive)
+    sendToRenderer(mainWindow, 'drive-scanner-attach', drive)
     if (drive.emitsProgress) {
       drive.on('progress', (progress: number) => {
-        mainWindow.webContents.send('drive-scanner-progress', { drive, progress })
+        sendToRenderer(mainWindow, 'drive-scanner-progress', { drive, progress })
       })
     }
   })
   deviceScanner.on('detach', (drive: scanner.adapters.AdapterSourceDestination) => {
-    mainWindow.webContents.send('drive-scanner-detach', drive)
+    sendToRenderer(mainWindow, 'drive-scanner-detach', drive)
   })
   deviceScanner.on('error', (error: Error) => {
-    mainWindow.webContents.send('drive-scanner-error', error)
+    sendToRenderer(mainWindow, 'drive-scanner-error', error)
   })
   deviceScanner.start()
 }
@@ -143,21 +181,21 @@ async function handleFlashDevice(_, mainWindow: BrowserWindow, flashItem: FlashI
   flashItem.drive = await assertFlashableDrive(flashItem.drive)
 
   return flashDevice(flashItem, (progress) => {
-    mainWindow.webContents.send('flash-progress', { progress, id: flashItem.id })
+    sendToRenderer(mainWindow, 'flash-progress', { progress, id: flashItem.id })
   })
 }
 
 function handleAgentEvents(mainWindow: BrowserWindow) {
   agentManager.on('logs', (logs) => {
-    mainWindow.webContents.send('agent-logs', { logs })
+    sendToRenderer(mainWindow, 'agent-logs', { logs })
   })
 
   agentManager.on('state', ({ activeItem, state }) => {
-    mainWindow.webContents.send('agent-state', { activeItem, state })
+    sendToRenderer(mainWindow, 'agent-state', { activeItem, state })
   })
 
   agentManager.on('download-progress', ({ progress, state }) => {
-    mainWindow.webContents.send('agent-download-progress', { progress, state })
+    sendToRenderer(mainWindow, 'agent-download-progress', { progress, state })
   })
 }
 
