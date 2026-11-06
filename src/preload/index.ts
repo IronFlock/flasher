@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { RPC } from '../types'
-import type { AgentDownloadStatus, FlashItem, SupportedBoard } from '../types'
+import type { AgentDownloadStatus, BoardCatalogs, FlashItem } from '../types'
 import type { Drive } from 'drivelist'
 import type { WiFiNetwork } from 'node-wifi'
 
@@ -36,7 +36,9 @@ const api = {
   // Electron 32+ removed File.path; getPathForFile is the supported way to resolve
   // the absolute path of a drag-and-dropped file from the renderer.
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
-  getSupportedBoards: () => ipcRenderer.invoke(RPC.GetSupportedBoards) as Promise<SupportedBoard[]>,
+  // Throttled in the main process (5 minutes); force: an explicit retry.
+  getSupportedBoards: (force = false) =>
+    ipcRenderer.invoke(RPC.GetSupportedBoards, force) as Promise<BoardCatalogs>,
   scanWifi: () => ipcRenderer.invoke(RPC.ScanWifi) as Promise<WiFiNetwork[]>,
   testDevice: (flashItem: FlashItem) => ipcRenderer.invoke(RPC.TestDevice, flashItem),
   stopDevice: () => ipcRenderer.invoke(RPC.StopDevice),

@@ -4,6 +4,7 @@ import { setupIpcHandlers } from './ipcHandlers'
 import { join } from 'path'
 import { activeProcesses, cleanupAppImageIfExists } from './api/permissions'
 import { isFile, killProcessDarwin } from './utils'
+import { isConfigFileName } from '../shared/images'
 import { autoUpdater } from 'electron-updater'
 import log from 'electron-log/main'
 import fixPath from 'fix-path'
@@ -135,7 +136,8 @@ async function handleArguments(argv: string[]) {
       return
     }
 
-    if (!(await isFile(param))) return
+    // Device files only: FlockFlasher flashes no local image files.
+    if (!isConfigFileName(param) || !(await isFile(param))) return
 
     await imageItemListReady
 
@@ -153,7 +155,7 @@ app.setAsDefaultProtocolClient('flock')
 app.on('open-file', async (event, path) => {
   event.preventDefault()
 
-  if (!(await isFile(path))) return
+  if (!isConfigFileName(path) || !(await isFile(path))) return
 
   await imageItemListReady
 

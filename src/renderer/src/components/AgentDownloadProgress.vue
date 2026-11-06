@@ -20,14 +20,14 @@ const percentage = computed(() => {
   return Math.min(100, Math.max(0, Math.round(p)))
 })
 
-const color = computed(() => {
+const icon = computed(() => {
   switch (downloadState.value) {
     case 'failed':
-      return 'error'
+      return 'mdi-alert-circle-outline'
     case 'finished':
-      return 'success'
+      return 'mdi-check-circle-outline'
     default:
-      return 'primary'
+      return 'mdi-download-outline'
   }
 })
 
@@ -67,20 +67,48 @@ watch(
 </script>
 
 <template>
-  <v-snackbar v-model="visible" :timeout="-1" location="bottom" :color="color">
-    <div class="d-flex flex-column" style="min-width: 240px">
-      <div class="d-flex align-center justify-space-between">
-        <span>{{ message ? $t(message) : '' }}</span>
-        <span v-if="isDownloading" class="ml-4">{{ percentage }}%</span>
+  <v-snackbar
+    v-model="visible"
+    :timeout="-1"
+    location="bottom right"
+    :content-class="['toast', { 'toast--error': downloadState === 'failed' }]"
+  >
+    <div class="agent-progress">
+      <div class="toast__body">
+        <v-icon>{{ icon }}</v-icon>
+        <span class="agent-progress__text">{{ message ? $t(message) : '' }}</span>
+        <span v-if="isDownloading" class="num">{{ percentage }} %</span>
       </div>
-      <v-progress-linear
-        v-if="isDownloading"
-        class="mt-2"
-        :model-value="percentage"
-        color="accent"
-        height="6"
-        rounded
-      />
+      <div v-if="isDownloading" class="agent-progress__meter">
+        <div class="agent-progress__fill" :style="{ width: `${percentage}%` }"></div>
+      </div>
     </div>
   </v-snackbar>
 </template>
+<style scoped>
+.agent-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 260px;
+}
+
+.agent-progress__text {
+  flex: 1;
+}
+
+/* A meter on the dark toast: a light track, a light fill. */
+.agent-progress__meter {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.agent-progress__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: #d9cffa; /* primary-200 of the light ramp: the toast is dark in both themes */
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+</style>

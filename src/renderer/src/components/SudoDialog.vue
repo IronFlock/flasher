@@ -21,7 +21,7 @@ async function setSudoPassword() {
     snackstore.setText('errors.invalid_sudo_password')
     snackstore.setColor('error')
     snackstore.setVisible(true)
-    
+
     return // do nothing
   } finally {
     checkingPassword.value = false
@@ -65,46 +65,59 @@ watch(showDialog, (newVal) => {
 })
 </script>
 <template>
-  <v-dialog v-model="showDialog" max-width="500px">
-    <v-card min-height="180px">
-      <v-toolbar color="primary" class="d-flex justify-left">
-        <v-card-text class="headline white--text">
-          {{ $t('authentication_required') }}
-        </v-card-text>
-      </v-toolbar>
+  <v-dialog v-model="showDialog" max-width="480px">
+    <v-card class="dlg">
+      <div class="dlg__head">
+        <span class="icon-tile sudo__tile">
+          <v-icon size="20">mdi-shield-lock-outline</v-icon>
+        </span>
+        <h2 class="dlg__title">{{ $t('authentication_required') }}</h2>
+        <v-btn
+          class="btn-ghost"
+          icon="mdi-close"
+          size="small"
+          variant="text"
+          :aria-label="$t('close')"
+          @click="closeDialog"
+        ></v-btn>
+      </div>
 
-      <v-card-text class="">
-        <v-container pt-4>
-          <div>
-            {{ $t('authentication_explanation') }}
-          </div>
+      <div class="dlg__body">
+        <p class="t-body">{{ $t('authentication_explanation') }}</p>
 
-          <!-- <div>
-            To allow for (raw) access to any SD cards and USB drives connected to
-            this machine authentication as (admin)user is required.
-          </div> -->
-
-          <!-- <div class="d-flex justify-center" id="auth-footnote">
-            (note that the password is only used to temporarily acquire root
-            permissions and is neither stored nor made permanently accessible
-            in any way!)
-          </div> -->
-        </v-container>
-
-        <v-container py-2>
-          <v-text-field v-model="sudoPassword" autofocus :append-icon="showSudoPassword ? 'mdi-eye' : 'mdi-eye-off'"
-            :type="showSudoPassword ? 'text' : 'password'" name="input-sudoPasswd" variant="outlined"
-            :label="$t('admin_password')" :disabled="checkingPassword"
-            @click:append="showSudoPassword = !showSudoPassword" v-on:keyup.enter="setSudoPassword"></v-text-field>
-        </v-container>
-
-        <div class="d-flex justify-center">
-          <v-btn small color="secondary" rounded :loading="checkingPassword" @click="setSudoPassword">
-            <v-icon left> mdi-exit-to-app </v-icon>
-            {{ $t('submit') }}
-          </v-btn>
+        <div class="fld">
+          <label class="fld__label" for="sudo-password">{{ $t('admin_password') }}</label>
+          <v-text-field
+            id="sudo-password"
+            v-model="sudoPassword"
+            autofocus
+            :append-inner-icon="showSudoPassword ? 'mdi-eye' : 'mdi-eye-off'"
+            :type="showSudoPassword ? 'text' : 'password'"
+            name="input-sudoPasswd"
+            :disabled="checkingPassword"
+            hide-details
+            @click:append-inner="showSudoPassword = !showSudoPassword"
+            v-on:keyup.enter="setSudoPassword"
+          ></v-text-field>
         </div>
-      </v-card-text>
+      </div>
+
+      <div class="dlg__foot">
+        <v-btn
+          color="primary"
+          prepend-icon="mdi-lock-open-variant-outline"
+          :loading="checkingPassword"
+          @click="setSudoPassword"
+        >
+          {{ $t('submit') }}
+        </v-btn>
+      </div>
     </v-card>
   </v-dialog>
 </template>
+<style scoped>
+.sudo__tile {
+  background: var(--primary-100);
+  color: var(--primary-600);
+}
+</style>

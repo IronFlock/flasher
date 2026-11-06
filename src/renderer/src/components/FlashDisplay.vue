@@ -2,16 +2,8 @@
 import humanizeDuration from 'humanize-duration'
 import { useFlashStore } from '@renderer/store/flash'
 import { storeToRefs } from 'pinia'
-import { use } from 'echarts/core'
-import { GaugeChart } from 'echarts/charts'
-import { TitleComponent, TooltipComponent, LegendComponent } from 'echarts/components'
-import { CanvasRenderer } from 'echarts/renderers'
-import { watch } from 'vue'
 import { computed } from 'vue'
-import { ref } from 'vue'
 import prettyBytes from 'pretty-bytes'
-
-use([TitleComponent, TooltipComponent, LegendComponent, GaugeChart, CanvasRenderer])
 
 const props = defineProps({
   id: Number
@@ -21,9 +13,7 @@ const flashStore = useFlashStore()
 const { flashItemById } = storeToRefs(flashStore)
 
 const flashItem = computed(() => flashItemById.value(props.id ?? 0))
-const progressLabel = ref()
-const etaLabel = ref()
-const speedLabel = ref()
+
 const shortEnglishHumanizer = humanizeDuration.humanizer({
   language: 'shortEn',
   languages: {
@@ -40,44 +30,26 @@ const shortEnglishHumanizer = humanizeDuration.humanizer({
   }
 })
 
-watch(
-  flashItem,
-  (newVal) => {
-    progressLabel.value = newVal?.flash?.progress.toFixed(2) + '%'
-    etaLabel.value = shortEnglishHumanizer(Math.round(newVal?.flash.eta ?? 0) * 1000)
-    speedLabel.value = prettyBytes(newVal?.flash.speed ?? 0) + '/s'
-  },
-  { deep: true }
+const progressLabel = computed(() => (flashItem.value?.flash.progress ?? 0).toFixed(2) + ' %')
+const speedLabel = computed(() => prettyBytes(flashItem.value?.flash.speed ?? 0) + '/s')
+const etaLabel = computed(() =>
+  shortEnglishHumanizer(Math.round(flashItem.value?.flash.eta ?? 0) * 1000)
 )
 </script>
 <template>
-  <v-container>
-    <div class="flex-justify-center mt-n5 mb-5">
-      <v-row>
-        <v-col cols="3">
-          <v-text-field
-            :label="$t('completed')"
-            variant="outlined"
-            v-model="progressLabel"
-            readonly
-          >
-          </v-text-field>
-        </v-col>
-
-        <v-col cols="1"> </v-col>
-
-        <v-col cols="3">
-          <v-text-field :label="$t('speed')" variant="outlined" v-model="speedLabel" readonly>
-          </v-text-field>
-        </v-col>
-
-        <v-col cols="1"> </v-col>
-
-        <v-col cols="3">
-          <v-text-field :label="$t('eta')" variant="outlined" v-model="etaLabel" readonly>
-          </v-text-field>
-        </v-col>
-      </v-row>
+  <!-- Stat tiles (design spec §2.10): label, value. -->
+  <div class="stats">
+    <div class="stat">
+      <span class="stat__k">{{ $t('completed') }}</span>
+      <span class="stat__v">{{ progressLabel }}</span>
     </div>
-  </v-container>
+    <div class="stat">
+      <span class="stat__k">{{ $t('speed') }}</span>
+      <span class="stat__v">{{ speedLabel }}</span>
+    </div>
+    <div class="stat">
+      <span class="stat__k">{{ $t('eta') }}</span>
+      <span class="stat__v">{{ etaLabel }}</span>
+    </div>
+  </div>
 </template>

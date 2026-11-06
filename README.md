@@ -46,6 +46,97 @@ App's key, `RELEASE_APP_PRIVATE_KEY`, and its variable `RELEASE_APP_CLIENT_ID`. 
 nothing else. `gh secret list -R IronFlock/flasher -e release` shows the names and dates, never the
 values.
 
+## Board catalog
+
+FlockFlasher writes nothing but the FlockOS images of one catalog, the signed FlockOS catalog. A
+device is added by its device file (`.flock`, or an older `.reswarm`); the user picks the hardware
+(menu "Hardware") and then its variant (menu "FlockOS variant"). The main process keeps the
+verified catalog, looks up the image there by its key (`<image_id>@<version>`, `imageKey` in
+`src/shared/images.ts`), downloads it, and checks the catalog's size and SHA-256 before it writes
+it. A flash request can name nothing else: no
+local image file, path or URL (`assertFlashRequest` in `src/main/security/validation.ts`, checked
+by the flash IPC handler and again in `flashDevice`). Files the app opens (file dialog, drag and
+drop, file association) are device files only.
+
+### The signed FlockOS catalog
+
+`https://instance-registry.ironflock.com/dl/flockos/manifest.json`, published by every FlockOS
+release ([FlockOS ADR-0009](https://github.com/IronFlock/flockos/blob/main/docs/adr/0009-phase-2-decisions-hostname-channels-firmware.md),
+[schema](https://github.com/IronFlock/flockos/blob/main/docs/manifest.schema.json)). It is the
+device-agent's envelope, `{"payload": "<base64 of the payload JSON>", "signature": "<base64 of a
+64-byte Ed25519 signature>"}`, at most 64 KiB, signed over the lines `flockos-manifest:v1`,
+`flockos/manifest.json` and the payload's SHA-256 (lowercase hex), joined by `\n` without a
+trailing newline. `src/main/security/catalog.ts` verifies it with Node's `crypto`:
+
+- The trusted keys are compiled in as `FLOCKOS_CATALOG_PUBLIC_KEYS` (the Cloud KMS key
+  `ironflock-release/flockos-catalog`, version 1, key id `f5e1308e`;
+  [PEM form](https://github.com/IronFlock/flockos/blob/main/pki/flockos-catalog.pub)). To rotate,
+  release a FlockFlasher that lists both keys before FlockOS signs with the new one, and drop the
+  old line in a later release.
+- A catalog that is unsigned, tampered with, signed by another key, larger than 64 KiB, not JSON,
+  of another `schema`, malformed, internally inconsistent (a board's image differs from its
+  release) or issued before the one accepted last is refused: the app shows the error and offers
+  no board, or, after a failed refresh, the boards verified before. It never falls back to
+  unverified data.
+- Forward compatible: an image of a `variant`, `kernel` or `architecture` this FlockFlasher does
+  not know (from a newer release) is skipped with a log line, and a board left without a known
+  image is hidden. Unknown fields are ignored.
+- The catalog is fetched at start and again whenever the board list is shown (adding a device,
+  opening the board list), at most every 5 minutes, and at once with Retry after an error, so a
+  release published while the app is open appears without a restart. Idle devices keep their
+  board and variant on the new release.
+- The last verified catalog is kept in `~/.Reflasher/flockos-manifest.json`. It is used only when
+  the catalog cannot be reached (network or HTTP error), with a notice. The rollback check is
+  against the newer of it and the catalog in use.
+
+The `boards` of the catalog show the production release. The menus of a device:
+
+1. "Hardware": the board (its model name).
+2. "FlockOS variant": the board's images without the installer, `base` (the default), `base` with
+   the real-time kernel (`rt`) and `nvidia`.
+3. "How to install", only when the board's installer stick carries the chosen variant: write the
+   variant's image to the drive (the default; the drive becomes the device's boot disk), or write
+   the installer stick, which installs the variant onto the device's internal disk. The stick is
+   a way to deliver a variant, not a variant. Its catalog entry lists the image ids it carries
+   (`payloads`); a catalog without them (v0.10.0) means the target's base image. Payload ids that
+   are not images of the release and target are dropped with a log line.
+
+Every FlockOS image is a raw image published as `.img.gz` (schema 1 allows nothing else); size and
+SHA-256 are checked on the download, which is then decompressed into `~/.Reflasher` and written
+from there. For an installer stick the main process checks that the chosen variant is one of the
+stick's payloads in the verified catalog (`CatalogStore.plan`) before it writes anything.
+
+### No ReswarmOS images
+
+FlockFlasher no longer offers ReswarmOS images: it does not read the ReswarmOS catalog
+(`dl/reswarmos/supportedBoardsImages.json`), and it has no ISO repack. Boards that only ReswarmOS
+supports (Raspberry Pi 3 and Zero, 32-bit Arm, the ReswarmOS installer ISO for PCs) need
+FlockFlasher v2.2.4 or older ([releases](https://github.com/IronFlock/flasher/releases)). A
+device's `.reswarm` file still opens, and is written to the device as a `.flock`.
+
+### The device file on the flashed drive
+
+After writing a `.flock` item, FlockFlasher puts the device file onto the FAT partition labelled
+`FLOCKOS` (every FlockOS image has one, the installer stick included), or, as a fallback, onto the
+first FAT partition. It finds the partition by label and file system, not by
+order (`src/main/utils/config-partition.ts`), and mounts it if the OS did not:
+
+- Linux: `lsblk` (through sudo when the udev database has no file systems yet), `udisksctl mount`,
+  else `mount -t vfat` through sudo into a temporary directory.
+- macOS: `diskutil list` and `diskutil info`, `diskutil mount` (through sudo if needed). macOS does
+  not mount an EFI system partition by itself, and `FLOCKOS` is the EFI system partition on
+  `amd64-efi` and `arm64-efi`.
+- Windows: PowerShell's Storage cmdlets list the partitions; a partition without a drive letter
+  gets one from `Add-PartitionAccessPath`, or from `diskpart` for an EFI system partition.
+
+The file is synced, and a partition FlockFlasher mounted is unmounted again (on Windows, the drive
+letter it assigned is removed). The device gets `<name>.flock` only, also for a `.reswarm` file;
+its enroll removes the file after use, so no copy with the device's credentials is left behind.
+An installer stick also gets `installer.conf` with the one line `payload=<image id>` (the chosen
+variant); every other key keeps the installer's default (`confirm=yes`: it asks on the console
+before it writes).
+The `.flock` and `.reswarm` file associations stay.
+
 ## EtcherSDK
 
 FlockFlasher uses the etcher-sdk to flash and mount drives.
@@ -98,14 +189,6 @@ We use [Pinia](https://github.com/vuejs/pinia), a straightforward and simple glo
 ### Translations
 
 For app-wide translations, we utilize the `I18next` internationalization framework. Adding, updating, creating, and deleting translations is as simple as creating or editing a file in the `renderer/locales` folder and then registering the new languages in the `renderer/src/main.ts` file.
-
-### Extra binaries
-
-To rebuild the `.iso` image, we use the `xorriso` binary. Unfortunately, this binary is not available on macOS and Windows. Therefore, we provide a statically cross-compiled binary for both Windows and Linux.
-
-These binaries are distributed using the [extraResources](https://www.electron.build/configuration/contents.html#extraresources) property of Electron Builder and are utilized during the flashing process.
-
-You can find the binaries in the `resources/binaries` folder.
 
 ## Flashing runtime (why there is a bundled Node binary)
 

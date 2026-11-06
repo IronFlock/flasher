@@ -1,0 +1,637 @@
+/*
+ * Global styles: the IronFlock Studio design recipes
+ * (STUDIO-DESIGN-POLISH-SPEC.md §2) applied to Vuetify.
+ * Load order: vuetify/styles, tokens.css, then this file.
+ */
+
+/* ---- Base ---------------------------------------------------------------- */
+
+html {
+  overflow: hidden;
+  font-family: var(--font-sans);
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-900);
+  background: var(--surface-50);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.v-application {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+::selection {
+  background: var(--primary-200);
+}
+
+a {
+  color: var(--primary-600);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--primary-700);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line-300);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-300);
+}
+
+/* ---- Type scale (spec §1.5) ---------------------------------------------- */
+
+.t-title {
+  margin: 0;
+  font: 600 24px/32px var(--font-sans);
+  letter-spacing: -0.01em;
+  color: var(--ink-900);
+}
+
+.t-heading {
+  margin: 0;
+  font: 600 18px/26px var(--font-sans);
+  color: var(--ink-900);
+}
+
+.t-subheading {
+  margin: 0;
+  font: 600 16px/24px var(--font-sans);
+  color: var(--ink-900);
+}
+
+.t-meta {
+  margin: 0;
+  font: 400 13px/18px var(--font-sans);
+  color: var(--ink-400);
+}
+
+.t-body {
+  margin: 0;
+  font: 400 14px/20px var(--font-sans);
+  color: var(--ink-500);
+}
+
+.eyebrow {
+  margin: 0;
+  font: 600 12px/16px var(--font-sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Cards and list rows (spec §2.1, §2.7) -------------------------------- */
+
+.card {
+  background: var(--surface-0);
+  border: 1px solid var(--line-200);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.list-card {
+  background: var(--surface-0);
+  border: 1px solid var(--line-200);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--h-row);
+  padding: 8px 16px;
+  border-top: 1px solid var(--line-200);
+  color: var(--ink-900);
+}
+
+.row:first-child {
+  border-top: 0;
+}
+
+.row__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.row__title {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row__meta {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-400);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.icon-tile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--surface-100);
+  color: var(--ink-500);
+}
+
+/* Header of a drawer or dialog-like panel: title block left, actions right. */
+.panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* ---- Chips and status (spec §2.5): always dot + word ---------------------- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  font: 500 12px/16px var(--font-sans);
+  white-space: nowrap;
+  background: var(--surface-100);
+  color: var(--ink-500);
+}
+
+.chip--online {
+  background: var(--green-100);
+  color: var(--green-600);
+}
+
+.chip--offline {
+  background: var(--red-100);
+  color: var(--red-600);
+}
+
+.chip--warn {
+  background: var(--orange-100);
+  color: var(--orange-600);
+}
+
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-300);
+}
+
+.chip--online .dot {
+  background: var(--green-500);
+}
+
+.chip--offline .dot {
+  background: var(--red-500);
+}
+
+.chip--warn .dot {
+  background: var(--amber-500);
+}
+
+/* ---- Stat tiles and meters (spec §2.7, §2.10) ------------------------------ */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: var(--surface-50);
+  border: 1px solid var(--line-200);
+}
+
+.stat__k {
+  font: 500 12px/16px var(--font-sans);
+  color: var(--ink-400);
+}
+
+.stat__v {
+  font: 600 20px/28px var(--font-sans);
+  color: var(--ink-900);
+  font-variant-numeric: tabular-nums;
+}
+
+.meter {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-200);
+  overflow: hidden;
+}
+
+.meter__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary-600);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ---- Forms: label above the field (spec §2.4) ----------------------------- */
+
+.fld {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fld__label {
+  font: 500 13px/18px var(--font-sans);
+  color: var(--ink-700);
+}
+
+/* Vuetify inputs grow (flex: 1 1 auto); inside a label-above column they must
+   keep their own height, or a taller neighbour in the grid row stretches them. */
+.fld > .v-input {
+  flex: none;
+}
+
+/* Two options with an explanation each: radio cards (spec §2.10, wizard). */
+.radio-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.radio-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-300);
+  border-radius: var(--radius-md);
+  background: var(--surface-0);
+  font: 500 14px/20px var(--font-sans);
+  color: var(--ink-900);
+  cursor: pointer;
+}
+
+.radio-card:hover {
+  border-color: var(--ink-300);
+}
+
+.radio-card input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--primary-600);
+}
+
+.radio-card--on,
+.radio-card--on:hover {
+  border-color: var(--primary-600);
+  background: var(--primary-100);
+  color: var(--primary-800);
+}
+
+.radio-card:has(input:focus-visible) {
+  outline: 2px solid var(--primary-200);
+  outline-offset: 1px;
+}
+
+/* ---- Vuetify: buttons (spec §2.2) ------------------------------------------ */
+
+.v-btn {
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.v-btn--size-default:not(.v-btn--icon) {
+  --v-btn-height: var(--h-button);
+  padding: 0 16px;
+  font-size: 14px;
+}
+
+.v-btn--size-small:not(.v-btn--icon) {
+  --v-btn-height: var(--h-button-sm);
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.v-btn .v-btn__prepend {
+  margin-inline: 0 8px;
+}
+
+.v-btn:not(.v-btn--icon) .v-icon {
+  font-size: 18px;
+}
+
+/* Filled buttons are flat: no Material elevation. */
+.v-btn--variant-elevated,
+.v-btn--variant-flat {
+  box-shadow: none;
+}
+
+/* Secondary: white, line-300 border, ink-900 label. */
+.v-btn.btn-secondary {
+  background: var(--surface-0);
+  border: 1px solid var(--line-300);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink-900);
+}
+
+/* Ghost icon buttons (close, remove, refresh). */
+.v-btn.btn-ghost {
+  color: var(--ink-500);
+}
+
+.v-btn.btn-ghost:hover {
+  color: var(--ink-900);
+}
+
+.v-btn.btn-danger-ghost:hover {
+  background: var(--red-100);
+  color: var(--red-600);
+}
+
+/* Disabled: 45 % of the normal style, not a grey fill. */
+.v-btn--disabled,
+.v-btn--disabled:hover,
+.v-btn--disabled.v-btn--variant-elevated,
+.v-btn--disabled.v-btn--variant-flat {
+  opacity: 0.45;
+}
+
+.v-btn--disabled .v-btn__overlay {
+  opacity: 0 !important;
+}
+
+/* ---- Vuetify: inputs (spec §2.4) ------------------------------------------- */
+
+.v-input--density-compact {
+  --v-input-control-height: var(--h-input);
+  --v-input-padding-top: 10px;
+}
+
+.v-field {
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  letter-spacing: 0;
+  color: var(--ink-900);
+  background: var(--surface-0);
+}
+
+.v-field__input,
+.v-select__selection-text,
+.v-field input {
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.v-field__input input::placeholder,
+.v-field__input::placeholder {
+  color: var(--ink-400);
+  opacity: 1;
+}
+
+.v-field--variant-outlined .v-field__outline,
+.v-field--variant-outlined:hover .v-field__outline {
+  --v-field-border-opacity: 1;
+  color: var(--line-300);
+}
+
+.v-field--variant-outlined:hover .v-field__outline {
+  color: var(--ink-300);
+}
+
+.v-field--variant-outlined.v-field--focused .v-field__outline {
+  color: var(--primary-600);
+}
+
+.v-field--error:not(.v-field--disabled) .v-field__outline {
+  color: var(--red-600);
+}
+
+.v-field__append-inner .v-icon,
+.v-field__prepend-inner .v-icon {
+  color: var(--ink-400);
+  opacity: 1;
+}
+
+/* Hints line up with the field edge and the label above it. */
+.v-input .v-input__details {
+  padding-inline: 2px;
+}
+
+.v-messages {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-400);
+  opacity: 1;
+}
+
+/* Dropdown menus of selects and comboboxes. */
+.v-menu > .v-overlay__content {
+  border: 1px solid var(--line-200);
+  border-radius: var(--radius-md);
+  background: var(--surface-0);
+  box-shadow: var(--shadow-lg);
+}
+
+.v-menu > .v-overlay__content > .v-list {
+  padding: 4px;
+  background: var(--surface-0);
+  box-shadow: none;
+}
+
+.v-menu .v-list-item {
+  min-height: 40px !important;
+  border-radius: var(--radius-sm);
+}
+
+.v-list-item-title {
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: 0;
+}
+
+.v-card-text {
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: 0;
+}
+
+.v-switch .v-label,
+.v-selection-control .v-label {
+  font-size: 14px;
+  letter-spacing: 0;
+  color: var(--ink-900);
+  opacity: 1;
+}
+
+/* ---- Vuetify: overlays ------------------------------------------------------ */
+
+.v-tooltip > .v-overlay__content {
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--brand-900);
+  color: #fff;
+  font: 400 13px/18px var(--font-sans);
+}
+
+.v-dialog > .v-overlay__scrim {
+  --v-overlay-opacity: 1;
+  background: var(--backdrop);
+}
+
+.v-navigation-drawer {
+  border: 0;
+  background: var(--surface-50);
+}
+
+.v-navigation-drawer--temporary.v-navigation-drawer--active {
+  box-shadow: var(--shadow-lg);
+}
+
+.v-navigation-drawer__scrim {
+  background: var(--backdrop);
+  opacity: 1;
+}
+
+/* Dialog recipe (spec §2.7): white, 20px radius, 64px header with a hairline,
+   footer on surface-50 with the actions on the right. */
+.v-dialog > .v-overlay__content > .v-card.dlg {
+  border-radius: var(--radius-xl);
+  background: var(--surface-0);
+  box-shadow: var(--shadow-lg);
+  color: var(--ink-900);
+}
+
+.dlg__head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 0 12px 0 24px;
+  border-bottom: 1px solid var(--line-200);
+}
+
+.dlg__title {
+  flex: 1;
+  margin: 0;
+  font: 600 18px/26px var(--font-sans);
+  color: var(--ink-900);
+}
+
+.dlg__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+}
+
+.dlg__foot {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--line-200);
+  background: var(--surface-50);
+}
+
+/* Banners (catalog state): tinted, hairline in the same hue (spec §2.5). */
+.v-alert.banner {
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.v-alert.banner .v-alert-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: 0;
+}
+
+/* Toasts (spec §2.5): brand-900 by default, tinted red for errors. They sit
+   bottom right, capped so they never cover the update card (bottom left). */
+.v-snackbar__wrapper.toast {
+  min-width: 320px;
+  max-width: 480px;
+  margin: 8px; /* + Vuetify's 8px location offset = 16px from the edges */
+  border-radius: var(--radius-md);
+  background: var(--brand-900);
+  color: #fff;
+  box-shadow: var(--shadow-md);
+}
+
+.v-snackbar__wrapper.toast .v-snackbar__content {
+  padding: 12px 16px;
+  font: 500 14px/20px var(--font-sans);
+  letter-spacing: 0;
+}
+
+.v-snackbar__wrapper.toast--error {
+  border: 1px solid var(--red-200);
+  background: var(--red-100);
+  color: var(--red-600);
+}
+
+.toast__body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toast__body .v-icon {
+  flex: none;
+  font-size: 18px;
+}

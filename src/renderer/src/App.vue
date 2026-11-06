@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useTheme } from 'vuetify'
 
-import flockFlasherLogo from './assets/icon.png'
+// ?no-inline: a small SVG would become a data: URI, which the CSP (img-src 'self') blocks.
+import logoOnLight from './assets/ironflock-logo.svg?no-inline'
+import logoOnDark from './assets/icon.png'
 
 import Settings from './components/Settings.vue'
 import Drives from './components/Drives.vue'
@@ -11,9 +14,13 @@ import Snackbar from './components/Snackbar.vue'
 import UpdateBanner from './components/UpdateBanner.vue'
 import AgentDownloadProgress from './components/AgentDownloadProgress.vue'
 
+const theme = useTheme()
 const sudoDialog = ref()
 const drivesDrawer = ref(false)
 const settingsDrawer = ref(false)
+
+// The colour bird on the white header; the white bird on the dark one.
+const logo = computed(() => (theme.global.current.value.dark ? logoOnDark : logoOnLight))
 
 function toggleDrivesDrawer() {
   drivesDrawer.value = !drivesDrawer.value
@@ -42,105 +49,48 @@ watch(sudoDialog, (newVal) => {
       <Settings />
     </v-navigation-drawer>
 
-    <!-- -------------------- App bar -------------------- -->
+    <!-- -------------------- Header -------------------- -->
 
-    <v-app-bar app color="primary">
-      <v-btn min-width="164px" @click.stop="toggleDrivesDrawer" variant="outlined" color="accent">
-        {{ $t('drives') }}
-      </v-btn>
+    <v-app-bar class="app-header" flat height="64">
+      <div class="app-header__inner">
+        <v-btn
+          class="btn-secondary"
+          variant="outlined"
+          prepend-icon="mdi-usb-flash-drive-outline"
+          @click.stop="toggleDrivesDrawer"
+        >
+          {{ $t('drives') }}
+        </v-btn>
 
-      <v-spacer></v-spacer>
+        <div class="brand">
+          <img :src="logo" alt="" width="28" height="28" />
+          <span class="brand__name">FlockFlasher</span>
+        </div>
 
-      <div>
-        <v-toolbar-title>
-          <div style="display: flex; justify-content: center; align-items: center;">
-            <img :src="flockFlasherLogo" alt="FlockFlasher-logo" width="30" height="30" style="margin-right: 10px;" />
-            <p>FlockFlasher</p>
-          </div>
-        </v-toolbar-title>
+        <v-btn
+          class="btn-secondary"
+          variant="outlined"
+          prepend-icon="mdi-cog-outline"
+          @click.stop="toggleSettingsDrawer"
+        >
+          {{ $t('settings') }}
+        </v-btn>
       </div>
-
-      <v-spacer></v-spacer>
-
-      <v-btn min-width="164px" @click.stop="toggleSettingsDrawer" variant="outlined" color="accent">
-        {{ $t('settings') }}
-      </v-btn>
     </v-app-bar>
 
     <!-- -------------------- Devices -------------------- -->
 
     <v-main>
-      <v-container fluid ml-0 mr-0 mt-0 mb-12 pl-12 pr-12>
-        <Devices />
-      </v-container>
-    </v-main>
-
-    <v-main v-if="false">
-      <v-container fluid ml-0 mr-0 mt-0 mb-12 pl-12 pr-12></v-container>
+      <Devices />
     </v-main>
 
     <!-- -------------------- Footer -------------------- -->
 
-    <v-footer fixed class="pa-0" color="primary">
-      <v-container fluid fill-width class="ma-0 pa-0">
-        <div class="d-flex justify-center ma-0 mp-0">
-          <v-btn href="https://studio.ironflock.com/" target="_blank" variant="text" color="primary"
-            id="reswarm-link-button" rounded fixed>
-            IronFlock Platform
-          </v-btn>
-        </div>
-      </v-container>
+    <v-footer app class="app-footer" height="40">
+      <a href="https://studio.ironflock.com/" target="_blank" class="app-footer__link">
+        IronFlock Platform
+      </a>
     </v-footer>
-
-    <v-banner id="updaterBar" v-show="false" color="info" rounded elevation="10" style="z-index: 99" height="120"
-      width="370">
-      <div id="updaterText"></div>
-      <div>
-        <v-btn class="ma-2" min-width="120px">
-          {{ $t('dismiss') }}
-        </v-btn>
-        <v-btn class="ma-2" min-width="120px">
-          {{ $t('download') }}
-        </v-btn>
-      </div>
-      <div>
-        <v-progress-linear color="secondary" rounded height="40"> </v-progress-linear>
-      </div>
-      <div>
-        <v-btn class="ma-2" min-width="120px">
-          {{ $t('not_now') }}
-        </v-btn>
-        <v-btn class="ma-2" min-width="120px" color="accent">
-          {{ $t('install') }}
-        </v-btn>
-      </div>
-    </v-banner>
-
-    <v-dialog max-width="560px" persistent>
-      <v-card min-height="260px">
-        <v-toolbar color="primary">
-          <v-card-text class="headline white--text">
-            {{ $t('environment_variables') }}
-          </v-card-text>
-        </v-toolbar>
-
-        <v-card-text>
-          <div class="mt-8 mb-4" style="font-size: 16px">
-            <p>{{ $t('environment_variables_not_set') }}</p>
-            <p>
-              <strong></strong>
-            </p>
-            <p>{{ $t('please_ensure_environment_variables') }}</p>
-          </div>
-
-          <div class="d-flex justify-end">
-            <v-btn class="ma-2" min-width="120px" color="accent">
-              {{ $t('exit_reflasher') }}
-            </v-btn>
-          </div>
-        </v-card-text>
-      </v-card>
-    </v-dialog>
 
     <SudoDialog ref="sudoDialog" />
     <Snackbar />
@@ -150,50 +100,54 @@ watch(sudoDialog, (newVal) => {
 </template>
 
 <style>
-.v-footer {
-  height: 40px !important;
-  flex: none !important;
-  display: block !important;
+/* Header (spec §2.3): white, 64px, hairline below, no dark surface. */
+.v-app-bar.app-header {
+  background: var(--surface-0);
+  border-bottom: 1px solid var(--line-200);
+  color: var(--ink-900);
 }
 
-#reswarm-link-wrapper {
-  position: fixed;
-  bottom: -14px;
-  right: 0px;
+.app-header__inner {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  width: 100%;
+  padding: 0 32px;
 }
 
-#reswarm-link-button {
-  text-transform: none;
-  font-family: sans-serif;
-  font-size: 0.8em;
-  color: white !important;
-  letter-spacing: 0.3px;
-  padding: 0px 12px;
+.app-header__inner > :first-child {
+  justify-self: start;
 }
 
-#snacker-message {
-  text-align: center;
-  font-size: 15px;
+.app-header__inner > :last-child {
+  justify-self: end;
 }
 
-#updaterBar {
-  position: fixed;
-  bottom: 54px;
-  left: 14px;
-  text-align: center;
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-#updaterBar div {
-  border-bottom: none;
+.brand__name {
+  font: 600 16px/24px var(--font-sans);
+  color: var(--ink-900);
 }
 
-#updaterText {
-  font-size: 18px;
-  /* color: #233543; */
-  padding: 8px;
+/* Footer: a quiet hairline bar with one link. */
+.v-footer.app-footer {
+  justify-content: center;
+  padding: 0;
+  border-top: 1px solid var(--line-200);
+  background: var(--surface-0);
 }
 
-#updateProgress {
-  padding: 8px;
+.app-footer__link {
+  font: 500 13px/18px var(--font-sans);
+  color: var(--ink-500);
+}
+
+.app-footer__link:hover {
+  color: var(--primary-600);
 }
 </style>

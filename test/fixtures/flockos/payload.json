@@ -1,0 +1,317 @@
+{
+  "schema": 1,
+  "issued_at": "2026-11-06T00:18:10Z",
+  "channels": {
+    "production": "0.10.0",
+    "test": "0.10.0"
+  },
+  "releases": {
+    "0.10.0": {
+      "build_id": "20261105T234958Z-gbdb73e4",
+      "buildtime": "2026-11-05T23:49:58Z",
+      "min_agent": "1.6.1",
+      "images": {
+        "flockos-amd64-efi-base": {
+          "target": "amd64-efi",
+          "variant": "base",
+          "kernel": "std",
+          "architecture": "amd64",
+          "image": {
+            "url": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-amd64-efi-base-0.10.0.img.gz",
+            "sha256": "e1a09aa008a3b4fb95ee755c5a4fef76aec3f61b2c4367e3787a05540ed39270",
+            "size": 620764500
+          },
+          "bundle": {
+            "url": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-amd64-efi-base-0.10.0.raucb",
+            "sha256": "08f989d544859030612c9ffd46a975f22313db99403fdf5c7101e1253036ffca",
+            "size": 579869274,
+            "compatible": "flockos-amd64-efi-base"
+          }
+        },
+        "flockos-amd64-efi-base-rt": {
+          "target": "amd64-efi",
+          "variant": "base",
+          "kernel": "rt",
+          "architecture": "amd64",
+          "image": {
+            "url": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-amd64-efi-base-rt-0.10.0.img.gz",
+            "sha256": "bcced2dfd838ca8a97c3e2f423b43e93231ba9208da4d491acc30c5a43befad4",
+            "size": 633014085
+          },
+          "bundle": {
+            "url": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-amd64-efi-base-rt-0.10.0.raucb",
+            "sha256": "fd541bf59365ce1565dcc106f369866dd8605ec1f643a24ab06d46b89631354d",
+            "size": 590760541,
+            "compatible": "flockos-amd64-efi-base-rt"
+          }
+        },
+        "flockos-amd64-efi-installer": {
+          "target": "amd64-efi",
+          "variant": "installer",
+          "kernel": "std",
+          "architecture": "amd64",
+          "image": {
+            "url": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-amd64-efi-installer-0.10.0.img.gz",
+            "sha256": "06e6e3a90bfcb6581f93fd8ba78ba3864301e5331a32ab88d518e3e226056779",
+            "size": 1097422082
+          }
+        },
+        "flockos-amd64-efi-nvidia": {
+          "target": "amd64-efi",
+          "variant": "nvidia",
+          "kernel": "std",
+          "architecture": "amd64",
+          "image": {
+            "url": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-amd64-efi-nvidia-0.10.0.img.gz",
+            "sha256": "05d2f330a2a1a826244eaf61a09e12cabd6ee7fedc9cc03957efd4dc8ea2b6d7",
+            "size": 1014233654
+          },
+          "bundle": {
+            "url": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-amd64-efi-nvidia-0.10.0.raucb",
+            "sha256": "d40aba2a4ae6031325a0d27d3debcf479e466e5ed68533408c35760a64322608",
+            "size": 936864350,
+            "compatible": "flockos-amd64-efi-nvidia"
+          }
+        },
+        "flockos-arm64-efi-base": {
+          "target": "arm64-efi",
+          "variant": "base",
+          "kernel": "std",
+          "architecture": "arm64",
+          "image": {
+            "url": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-arm64-efi-base-0.10.0.img.gz",
+            "sha256": "792dca41c413910806f5745518fec921d619709d5900d54d9e706bcb0911b962",
+            "size": 564989233
+          },
+          "bundle": {
+            "url": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-arm64-efi-base-0.10.0.raucb",
+            "sha256": "9a46222fb8bc0e957604aee16272dffba7a30add13bed5ba797211825922bbf4",
+            "size": 522787418,
+            "compatible": "flockos-arm64-efi-base"
+          }
+        },
+        "flockos-arm64-efi-base-rt": {
+          "target": "arm64-efi",
+          "variant": "base",
+          "kernel": "rt",
+          "architecture": "arm64",
+          "image": {
+            "url": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-arm64-efi-base-rt-0.10.0.img.gz",
+            "sha256": "2975a6794364aa6f101a6afd7f73190b0e98abef1e8456dea7cfca436fed3bda",
+            "size": 576691928
+          },
+          "bundle": {
+            "url": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-arm64-efi-base-rt-0.10.0.raucb",
+            "sha256": "d969f5e9070e5cb8f42280c80185fcad01a977248ef5f73f6bf2e56e9aea3b6f",
+            "size": 532847197,
+            "compatible": "flockos-arm64-efi-base-rt"
+          }
+        },
+        "flockos-arm64-efi-installer": {
+          "target": "arm64-efi",
+          "variant": "installer",
+          "kernel": "std",
+          "architecture": "arm64",
+          "image": {
+            "url": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-arm64-efi-installer-0.10.0.img.gz",
+            "sha256": "d7609c9d9e81315514f7caee6a887a22994e6eae0b92d34e1c256ecc2f948eb7",
+            "size": 992911732
+          }
+        },
+        "flockos-rpi-arm64-base": {
+          "target": "rpi-arm64",
+          "variant": "base",
+          "kernel": "std",
+          "architecture": "arm64",
+          "image": {
+            "url": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-rpi-arm64-base-0.10.0.img.gz",
+            "sha256": "c4a9f0277e90a300903d11fc25d4c8244de87eea17ff787d0a3d6076d7cb7b34",
+            "size": 638894353
+          },
+          "bundle": {
+            "url": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-rpi-arm64-base-0.10.0.raucb",
+            "sha256": "8a59f1a7dcc5cee6ee356f26df037e350154096835d6ce751d8152d0d7e3340f",
+            "size": 599198418,
+            "compatible": "flockos-rpi-arm64-base"
+          }
+        }
+      }
+    }
+  },
+  "boards": [
+    {
+      "architecture": "amd64",
+      "board": "pc",
+      "boardname": "PC",
+      "cpu": "x86-64",
+      "docs": "https://github.com/IronFlock/flockos/blob/main/docs/targets/amd64-efi.md",
+      "reflasher": false,
+      "model": "amd64-efi",
+      "modelname": "x86-64 PC with UEFI",
+      "latestImages": [
+        {
+          "buildtime": "2026-11-05T23:49:58Z",
+          "download": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-amd64-efi-base-0.10.0.img.gz",
+          "file": "flockos-amd64-efi-base-0.10.0.img.gz",
+          "osname": "FlockOS",
+          "osvariant": "image",
+          "sha256": "e1a09aa008a3b4fb95ee755c5a4fef76aec3f61b2c4367e3787a05540ed39270",
+          "size": 620764500,
+          "update": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-amd64-efi-base-0.10.0.raucb",
+          "version": "0.10.0",
+          "image_id": "flockos-amd64-efi-base",
+          "variant": "base",
+          "kernel": "std"
+        },
+        {
+          "buildtime": "2026-11-05T23:49:58Z",
+          "download": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-amd64-efi-nvidia-0.10.0.img.gz",
+          "file": "flockos-amd64-efi-nvidia-0.10.0.img.gz",
+          "osname": "FlockOS",
+          "osvariant": "image",
+          "sha256": "05d2f330a2a1a826244eaf61a09e12cabd6ee7fedc9cc03957efd4dc8ea2b6d7",
+          "size": 1014233654,
+          "update": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-amd64-efi-nvidia-0.10.0.raucb",
+          "version": "0.10.0",
+          "image_id": "flockos-amd64-efi-nvidia",
+          "variant": "nvidia",
+          "kernel": "std"
+        },
+        {
+          "buildtime": "2026-11-05T23:49:58Z",
+          "download": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-amd64-efi-base-rt-0.10.0.img.gz",
+          "file": "flockos-amd64-efi-base-rt-0.10.0.img.gz",
+          "osname": "FlockOS",
+          "osvariant": "image",
+          "sha256": "bcced2dfd838ca8a97c3e2f423b43e93231ba9208da4d491acc30c5a43befad4",
+          "size": 633014085,
+          "update": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-amd64-efi-base-rt-0.10.0.raucb",
+          "version": "0.10.0",
+          "image_id": "flockos-amd64-efi-base-rt",
+          "variant": "base",
+          "kernel": "rt"
+        },
+        {
+          "buildtime": "2026-11-05T23:49:58Z",
+          "download": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-amd64-efi-installer-0.10.0.img.gz",
+          "file": "flockos-amd64-efi-installer-0.10.0.img.gz",
+          "osname": "FlockOS",
+          "osvariant": "image",
+          "sha256": "06e6e3a90bfcb6581f93fd8ba78ba3864301e5331a32ab88d518e3e226056779",
+          "size": 1097422082,
+          "update": "",
+          "version": "0.10.0",
+          "image_id": "flockos-amd64-efi-installer",
+          "variant": "installer",
+          "kernel": "std"
+        }
+      ]
+    },
+    {
+      "architecture": "arm64",
+      "board": "arm64-efi",
+      "boardname": "ARM64 machine",
+      "cpu": "ARMv8",
+      "docs": "https://github.com/IronFlock/flockos/blob/main/docs/targets/arm64-efi.md",
+      "reflasher": false,
+      "model": "arm64-efi",
+      "modelname": "ARM64 machine with UEFI",
+      "latestImages": [
+        {
+          "buildtime": "2026-11-05T23:49:58Z",
+          "download": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-arm64-efi-base-0.10.0.img.gz",
+          "file": "flockos-arm64-efi-base-0.10.0.img.gz",
+          "osname": "FlockOS",
+          "osvariant": "image",
+          "sha256": "792dca41c413910806f5745518fec921d619709d5900d54d9e706bcb0911b962",
+          "size": 564989233,
+          "update": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-arm64-efi-base-0.10.0.raucb",
+          "version": "0.10.0",
+          "image_id": "flockos-arm64-efi-base",
+          "variant": "base",
+          "kernel": "std"
+        },
+        {
+          "buildtime": "2026-11-05T23:49:58Z",
+          "download": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-arm64-efi-base-rt-0.10.0.img.gz",
+          "file": "flockos-arm64-efi-base-rt-0.10.0.img.gz",
+          "osname": "FlockOS",
+          "osvariant": "image",
+          "sha256": "2975a6794364aa6f101a6afd7f73190b0e98abef1e8456dea7cfca436fed3bda",
+          "size": 576691928,
+          "update": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-arm64-efi-base-rt-0.10.0.raucb",
+          "version": "0.10.0",
+          "image_id": "flockos-arm64-efi-base-rt",
+          "variant": "base",
+          "kernel": "rt"
+        },
+        {
+          "buildtime": "2026-11-05T23:49:58Z",
+          "download": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-arm64-efi-installer-0.10.0.img.gz",
+          "file": "flockos-arm64-efi-installer-0.10.0.img.gz",
+          "osname": "FlockOS",
+          "osvariant": "image",
+          "sha256": "d7609c9d9e81315514f7caee6a887a22994e6eae0b92d34e1c256ecc2f948eb7",
+          "size": 992911732,
+          "update": "",
+          "version": "0.10.0",
+          "image_id": "flockos-arm64-efi-installer",
+          "variant": "installer",
+          "kernel": "std"
+        }
+      ]
+    },
+    {
+      "architecture": "arm64",
+      "board": "raspberrypi",
+      "boardname": "Raspberry Pi",
+      "cpu": "BCM2711",
+      "docs": "https://github.com/IronFlock/flockos/blob/main/docs/targets/rpi-arm64.md",
+      "reflasher": false,
+      "model": "raspberrypi4",
+      "modelname": "Raspberry Pi 4, 400 and CM4",
+      "latestImages": [
+        {
+          "buildtime": "2026-11-05T23:49:58Z",
+          "download": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-rpi-arm64-base-0.10.0.img.gz",
+          "file": "flockos-rpi-arm64-base-0.10.0.img.gz",
+          "osname": "FlockOS",
+          "osvariant": "image",
+          "sha256": "c4a9f0277e90a300903d11fc25d4c8244de87eea17ff787d0a3d6076d7cb7b34",
+          "size": 638894353,
+          "update": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-rpi-arm64-base-0.10.0.raucb",
+          "version": "0.10.0",
+          "image_id": "flockos-rpi-arm64-base",
+          "variant": "base",
+          "kernel": "std"
+        }
+      ]
+    },
+    {
+      "architecture": "arm64",
+      "board": "raspberrypi",
+      "boardname": "Raspberry Pi",
+      "cpu": "BCM2712",
+      "docs": "https://github.com/IronFlock/flockos/blob/main/docs/targets/rpi-arm64.md",
+      "reflasher": false,
+      "model": "raspberrypi5",
+      "modelname": "Raspberry Pi 5 and CM5",
+      "latestImages": [
+        {
+          "buildtime": "2026-11-05T23:49:58Z",
+          "download": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-rpi-arm64-base-0.10.0.img.gz",
+          "file": "flockos-rpi-arm64-base-0.10.0.img.gz",
+          "osname": "FlockOS",
+          "osvariant": "image",
+          "sha256": "c4a9f0277e90a300903d11fc25d4c8244de87eea17ff787d0a3d6076d7cb7b34",
+          "size": 638894353,
+          "update": "https://instance-registry.ironflock.com/dl/flockos/0.10.0/flockos-rpi-arm64-base-0.10.0.raucb",
+          "version": "0.10.0",
+          "image_id": "flockos-rpi-arm64-base",
+          "variant": "base",
+          "kernel": "std"
+        }
+      ]
+    }
+  ]
+}

@@ -1,11 +1,19 @@
 <script setup lang="ts">
 import Agent from './Agent.vue'
-import type { SupportedBoard } from 'src/types'
+import type { FlashItem, ImageInfo, SupportedBoard } from 'src/types'
 import { storeToRefs } from 'pinia'
 import { useDrivesStore } from '@renderer/store/drives'
 import { Drive } from 'drivelist'
-import { watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { cutInfoString } from '../utils'
+import {
+  defaultImage,
+  hardwareTitle,
+  imageKey,
+  installerFor,
+  variantImages
+} from '../../../shared/images'
 import { useBoardStore } from '@renderer/store/boards'
 import { useWifiStore } from '@renderer/store/wifi'
 import { useFlashStore } from '@renderer/store/flash'
@@ -22,9 +30,55 @@ const agentStore = useAgentStore()
 
 const { downloadState } = storeToRefs(agentStore)
 const { drives } = storeToRefs(drivesStore)
-const { boards } = storeToRefs(boardStore)
+const { boards, flockos } = storeToRefs(boardStore)
+const { t } = useI18n()
+
+// Menu 1: the hardware only.
+const boardTitle = (board: SupportedBoard) => hardwareTitle(board, boards.value)
+
+// Menu 2: the variants of the chosen hardware, the FlockOS version once below.
+const variantTitle = (image: ImageInfo) => {
+  const variant = t(`variants.${image.variant}`)
+  return image.kernel === 'rt' ? `${variant}, ${t('variants.rt')}` : variant
+}
+
+const variantHint = (board: SupportedBoard | undefined) => {
+  if (!board) return t('choose_hardware_first')
+  const version = defaultImage(board.latestImages)?.version
+  return version ? `FlockOS ${version}` : ''
+}
+
+// Menu 3, only when the board's installer stick carries the chosen variant.
+const installMethods = computed(() => [
+  { value: 'direct', title: t('installation.direct') },
+  { value: 'installer', title: t('installation.installer') }
+])
 const { accessPoints } = storeToRefs(wifiStore)
 const { flashItems } = storeToRefs(flashStore)
+
+// One device card is open at a time: its form (idle) or its flash details.
+const openId = ref<number | null>(null)
+const toggle = (item: FlashItem) => {
+  openId.value = openId.value === item.id ? null : item.id
+}
+
+const BUSY_STATES = [
+  'flashing',
+  'downloading',
+  'configuring',
+  'verifying',
+  'starting',
+  'decompressing'
+]
+const REMOVABLE_STATES = [
+  'idle',
+  'finished',
+  'failed',
+  'verification-canceled',
+  'flashing-canceled'
+]
+const PROGRESS_STATES = ['decompressing', 'flashing', 'verifying', 'downloading']
+const RETRY_STATES = ['finished', 'failed', 'flashing-canceled', 'verification-canceled']
 
 async function addByFilePicker() {
   const { canceled, filePaths } = await window.api.chooseFile()
@@ -35,6 +89,9 @@ async function addByFilePicker() {
 
   return flashStore.addItem(fullPath)
 }
+
+// A refreshed catalog: keep each device's board and image choice on it.
+watch(boards, (list) => flashStore.rebindBoards(list))
 
 // Update drive of flashitem if drive list changes
 watch(drives, (updatedDl) => {
@@ -49,494 +106,475 @@ watch(drives, (updatedDl) => {
 })
 </script>
 <template>
-  <v-container>
-    <div class="header">
-      <v-list-item>
-        <v-list-item-title class="title">
-          {{ $t('devices') }}
-        </v-list-item-title>
+  <div class="page">
+    <header class="page-head">
+      <div class="page-head__row">
+        <div>
+          <h1 class="t-title">{{ $t('devices') }}</h1>
+          <p class="t-meta">{{ $t('devices_list_subtitle') }}</p>
+        </div>
+        <v-btn color="primary" prepend-icon="mdi-plus" @click="addByFilePicker">
+          {{ $t('add_device') }}
+        </v-btn>
+      </div>
 
-        <v-list-item-subtitle>
-          {{ $t('devices_list_subtitle') }}
-        </v-list-item-subtitle>
-      </v-list-item>
-      <v-tooltip bottom>
-        <template v-slot:activator="{ props }">
-          <v-btn
-            v-bind="props"
-            @click="addByFilePicker"
-            icon="mdi-plus"
-            fixed
-            elevation="10"
-            color="accent"
-            fab
-          >
+      <v-alert
+        v-if="flockos && !flockos.ok"
+        class="banner"
+        type="error"
+        variant="tonal"
+        density="compact"
+        :title="
+          flockos.kept
+            ? $t('catalog.kept', { issuedAt: flockos.kept.issuedAt })
+            : $t('catalog.refused')
+        "
+        :text="flockos.error"
+      >
+        <template #append>
+          <v-btn size="small" variant="text" @click="boardStore.refresh(true)">
+            {{ $t('catalog.retry') }}
           </v-btn>
         </template>
-        <span>{{ $t('add_device') }}</span>
-      </v-tooltip>
-    </div>
+      </v-alert>
+      <v-alert
+        v-else-if="flockos?.ok && flockos.fromCache"
+        class="banner"
+        type="info"
+        variant="tonal"
+        density="compact"
+        :text="$t('catalog.offline', { issuedAt: flockos.issuedAt })"
+      >
+        <template #append>
+          <v-btn size="small" variant="text" @click="boardStore.refresh(true)">
+            {{ $t('catalog.retry') }}
+          </v-btn>
+        </template>
+      </v-alert>
+    </header>
 
-    <v-divider style="margin-top: 20px"></v-divider>
+    <div class="device-list">
+      <article v-for="flashItem in flashItems" :key="flashItem.id" class="card device">
+        <!-- -------------------- What gets flashed where -------------------- -->
 
-    <v-expansion-panels>
-      <v-expansion-panel v-for="flashItem in flashItems">
-        <!-- -------------------- Header of Device -------------------- -->
-
-        <v-expansion-panel-title>
-          <template v-slot>
-            <div class="infobox-container">
-              <div v-if="flashItem.reswarm" class="infoBox infoBoxA">
-                <div class="textHead">
-                  {{ $t('device') }}
-                </div>
-                <div class="textDesc deviceName">
-                  {{
-                    cutInfoString(flashItem.reswarm?.config?.name ?? '', 20, $t('no_device_name'))
-                  }}
-                </div>
-                <div class="textMain">
-                  {{ cutInfoString(flashItem.reswarm?.config?.description ?? '', 20, '') }}
-                </div>
-              </div>
-
-              <div v-if="flashItem.reswarm" class="infoBox infoBoxA">
-                <div class="textHead">
-                  {{ $t('swarm') }}
-                </div>
-                <div class="textDesc">
-                  {{
-                    cutInfoString(
-                      flashItem.reswarm?.config?.swarm_owner_name ?? '',
-                      25,
-                      $t('no_swarm_owner')
-                    )
-                  }}
-                </div>
-                <div class="textMain">
-                  {{
-                    cutInfoString(flashItem.reswarm?.config?.swarm_name ?? '', 25, $t('no_swarm'))
-                  }}
-                </div>
-              </div>
-
-              <div v-if="!flashItem.reswarm" class="infoBox infoBoxB">
-                <div class="textHead">
-                  {{ $t('image') }}
-                </div>
-                <div class="textDesc">
-                  {{ cutInfoString(flashItem.fileDirectory, 50) }}
-                </div>
-                <div class="textMain">
-                  {{ cutInfoString(flashItem.fileName, 50) }}
-                </div>
-              </div>
-
-              <div class="infoBox">
-                <div class="textHead">
-                  {{ $t('drive') }}
-                </div>
-                <div class="textDesc" v-bind:class="{ textAlert: !flashItem.drive }">
-                  {{
-                    flashItem.drive
-                      ? cutInfoString(flashItem.drive.description, 25, $t('name_unknown'))
-                      : $t('unavailable')
-                  }}
-                </div>
-                <div class="textMain" v-bind:class="{ textAlert: !flashItem.drive }">
-                  {{
-                    flashItem.drive
-                      ? cutInfoString(
-                          flashItem.drive.device +
-                            ' (' +
-                            prettyBytes(flashItem.drive.size ?? 0) +
-                            ')',
-                          25
-                        )
-                      : $t('no_drive')
-                  }}
-                </div>
-              </div>
-
-              <div v-if="flashItem.reswarm" class="infoBox infoBoxA">
-                <div class="textHead">
-                  {{ $t('board') }}
-                </div>
-                <div
-                  class="textDesc"
-                  v-bind:class="{ textAlert: !flashItem.reswarm.config!.board }"
-                >
-                  {{
-                    flashItem.reswarm.config!.board
-                      ? cutInfoString(flashItem.reswarm.config!.board.architecture, 25)
-                      : $t('board')
-                  }}
-                </div>
-                <div
-                  class="textMain"
-                  v-bind:class="{ textAlert: !flashItem.reswarm.config!.board }"
-                >
-                  {{
-                    flashItem.reswarm.config!.board
-                      ? cutInfoString(flashItem.reswarm.config!.board.modelname, 25)
-                      : $t('choose_board')
-                  }}
-                </div>
-              </div>
-            </div>
-
-            <div class="buttons-container">
-              <div class="editButtons" v-if="flashItem.flash.state === 'idle'">
-                <v-btn size="small" height="40" color="primary" min-width="140px">
-                  <v-icon> mdi-pencil </v-icon>
-                  {{ $t('edit') }}
-                </v-btn>
-              </div>
-
-              <div class="editButtons" v-if="flashItem.flash.state !== 'idle'">
-                <v-btn size="small" height="40" color="primary" min-width="140px">
-                  <v-icon> mdi-scatter-plot </v-icon>
-                  {{ $t('details') }}
-                </v-btn>
-              </div>
-
-              <div class="actionButtons">
-                <v-btn
-                  v-if="flashItem.reswarm && flashItem.flash.state === 'idle'"
-                  :loading="downloadState === 'downloading'"
-                  @click.native.stop="agentStore.testDevice(flashItem)"
-                  style="margin-right: 16px"
-                  size="small"
-                  height="40"
-                  color="primary"
-                >
-                  <v-icon> mdi-play </v-icon>
-                  {{ $t('test_device') }}
-                </v-btn>
-
-                <v-btn
-                  size="small"
-                  :disabled="
-                    flashItem.flash.state === 'flashing' ||
-                    flashItem.flash.state === 'downloading' ||
-                    flashItem.flash.state === 'configuring' ||
-                    flashItem.flash.state === 'verifying' ||
-                    flashItem.flash.state === 'starting' ||
-                    flashItem.flash.state === 'extracting-iso' ||
-                    flashItem.flash.state === 'recreating-iso' ||
-                    flashItem.flash.state === 'decompressing' ||
-                    !flashItem.drive
-                  "
-                  @click.native.stop="flashStore.flashDevice(flashItem)"
-                  height="40"
-                  min-width="140px"
-                  color="primary"
-                >
-                  <v-icon> mdi-flash </v-icon>
-                  {{ $t('flash') }}
-                </v-btn>
-              </div>
-            </div>
-
-            <div>
-              <div id="removeButton">
-                <v-btn
-                  :disabled="
-                    flashItem.flash.state !== 'idle' &&
-                    flashItem.flash.state !== 'finished' &&
-                    flashItem.flash.state !== 'failed' &&
-                    flashItem.flash.state !== 'verification-canceled' &&
-                    flashItem.flash.state !== 'flashing-canceled'
-                  "
-                  @click.native.stop="flashStore.removeItem(flashItem)"
-                  variant="plain"
-                  icon="mdi-close-circle"
-                  color="error"
-                >
-                </v-btn>
-              </div>
-            </div>
-
-            <!-- -------------------- Header of Device (flashing active) -------------------- -->
-
-            <div id="flashDeviceBar">
-              <FlashDevice v-if="flashItem.flash.state !== 'idle'" :id="flashItem.id" />
-            </div>
-          </template>
-        </v-expansion-panel-title>
-
-        <!-- -------------------- Body of Device (inactive) -------------------- -->
-
-        <v-expansion-panel-text>
-          <div style="margin-top: 16px">
-            <v-select
-              v-if="flashItem.flash.state === 'idle'"
-              v-model="flashItem.drive"
-              :items="drives"
-              :label="$t('select_drive')"
-              :item-title="(el: Drive) => `${el.device} - (${prettyBytes(el.size ?? 0)})`"
-              :item-value="(el) => el"
-              :no-data-text="$t('no_drives_available')"
-              variant="outlined"
-            ></v-select>
-
-            <v-select
-              v-if="flashItem.reswarm && flashItem.flash.state === 'idle'"
-              v-model="flashItem.reswarm.config!.board"
-              :label="$t('choose_board_and_os')"
-              :items="boards.slice().sort((a, b) => a.modelname.localeCompare(b.modelname))"
-              :item-title="(el: SupportedBoard) => el.modelname + ' (' + el.architecture + ') ' + el.latestImages?.[0].version"
-              :item-value="(el) => el"
-              variant="outlined"
-            ></v-select>
-
-            <v-combobox
-              v-if="flashItem.reswarm && flashItem.flash.state === 'idle'"
-              v-model="flashItem.reswarm.config!.wlanssid"
-              :label="$t('specify_wlan_or_lan')"
-              item-title="ssid"
-              item-value="ssid"
-              :items="accessPoints"
-              variant="outlined"
-              :return-object="false"
-            ></v-combobox>
-
-            <v-text-field
-              v-if="flashItem.reswarm && flashItem.flash.state === 'idle'"
-              v-model="flashItem.reswarm.config!.password"
-              :label="$t('wlan_password')"
-              :append-icon="flashItem.reswarm.showPassword ? 'mdi-eye' : 'mdi-eye-off'"
-              :type="flashItem.reswarm.showPassword ? 'text' : 'password'"
-              name="input-password"
-              variant="outlined"
-              @click:append="flashItem.reswarm.showPassword = !flashItem.reswarm.showPassword"
-            ></v-text-field>
+        <div class="device__info">
+          <div v-if="flashItem.reswarm" class="kv">
+            <span class="kv__k">{{ $t('device') }}</span>
+            <span class="kv__v">
+              {{ cutInfoString(flashItem.reswarm?.config?.name ?? '', 28, $t('no_device_name')) }}
+            </span>
+            <span class="kv__s">
+              {{ cutInfoString(flashItem.reswarm?.config?.description ?? '', 32, '') }}
+            </span>
           </div>
 
-          <!-- -------------------- Body of Device (flashing active) -------------------- -->
+          <div v-if="flashItem.reswarm" class="kv">
+            <span class="kv__k">{{ $t('swarm') }}</span>
+            <span class="kv__v">
+              {{ cutInfoString(flashItem.reswarm?.config?.swarm_name ?? '', 28, $t('no_swarm')) }}
+            </span>
+            <span class="kv__s">
+              {{
+                cutInfoString(
+                  flashItem.reswarm?.config?.swarm_owner_name ?? '',
+                  32,
+                  $t('no_swarm_owner')
+                )
+              }}
+            </span>
+          </div>
 
-          <div v-show="flashItem.flash.state !== 'idle'">
-            <FlashDisplay
-              v-if="
-                flashItem.flash.state === 'decompressing' ||
-                flashItem.flash.state === 'flashing' ||
-                flashItem.flash.state === 'verifying' ||
-                flashItem.flash.state === 'downloading'
-              "
-              :id="flashItem.id"
-            >
-            </FlashDisplay>
+          <div class="kv">
+            <span class="kv__k">{{ $t('drive') }}</span>
+            <template v-if="flashItem.drive">
+              <span class="kv__v">
+                {{ cutInfoString(flashItem.drive.description, 28, $t('name_unknown')) }}
+              </span>
+              <span class="kv__s">
+                <span class="mono">{{ flashItem.drive.device }}</span> ·
+                {{ prettyBytes(flashItem.drive.size ?? 0) }}
+              </span>
+            </template>
+            <template v-else>
+              <span class="kv__v kv__v--alert">{{ $t('unavailable') }}</span>
+              <span class="kv__s">{{ $t('no_drive') }}</span>
+            </template>
+          </div>
 
-            <div class="d-flex justify-center">
-              <v-btn
-                v-if="flashItem.flash.state === 'flashing'"
-                small
-                color="secondary"
-                height="40"
-                @click.native.stop="flashStore.cancelFlashing(flashItem)"
-              >
-                <v-icon left> mdi-cancel </v-icon>
-                {{ $t('cancel_writing') }}
-              </v-btn>
-              <v-btn
-                v-if="flashItem.flash.state === 'verifying'"
-                small
-                color="secondary"
-                height="40"
-                @click.native.stop="flashStore.cancelFlashing(flashItem)"
-              >
-                <v-icon left> mdi-skip-next </v-icon>
-                {{ $t('skip_verification') }}
-              </v-btn>
+          <div v-if="flashItem.reswarm" class="kv">
+            <span class="kv__k">{{ $t('board') }}</span>
+            <template v-if="flashItem.reswarm.config!.board">
+              <span class="kv__v">
+                {{ cutInfoString(flashItem.reswarm.config!.board.modelname, 28) }}
+              </span>
+              <span>
+                <span class="chip">{{ flashItem.reswarm.config!.board.architecture }}</span>
+              </span>
+            </template>
+            <span v-else class="kv__v kv__v--alert">{{ $t('choose_board') }}</span>
+          </div>
 
-              <v-spacer></v-spacer>
+          <v-btn
+            class="device__remove btn-ghost btn-danger-ghost"
+            icon="mdi-close"
+            size="small"
+            variant="text"
+            :aria-label="$t('remove_device')"
+            :disabled="!REMOVABLE_STATES.includes(flashItem.flash.state)"
+            @click="flashStore.removeItem(flashItem)"
+          ></v-btn>
+        </div>
 
-              <v-btn
-                ref="button"
-                size="small"
-                color="secondary"
-                height="40"
-                @click="flashStore.reset(flashItem)"
+        <!-- -------------------- Actions and flash state -------------------- -->
+
+        <div class="device__bar">
+          <v-btn
+            class="btn-secondary"
+            variant="outlined"
+            :prepend-icon="
+              flashItem.flash.state === 'idle' ? 'mdi-pencil-outline' : 'mdi-information-outline'
+            "
+            :append-icon="openId === flashItem.id ? 'mdi-chevron-up' : 'mdi-chevron-down'"
+            :aria-expanded="openId === flashItem.id"
+            @click="toggle(flashItem)"
+          >
+            {{ flashItem.flash.state === 'idle' ? $t('edit') : $t('details') }}
+          </v-btn>
+
+          <div class="device__status">
+            <FlashDevice v-if="flashItem.flash.state !== 'idle'" :id="flashItem.id" />
+          </div>
+
+          <v-btn
+            v-if="flashItem.reswarm && flashItem.flash.state === 'idle'"
+            class="btn-secondary"
+            variant="outlined"
+            prepend-icon="mdi-play-outline"
+            :loading="downloadState === 'downloading'"
+            @click="agentStore.testDevice(flashItem)"
+          >
+            {{ $t('test_device') }}
+          </v-btn>
+
+          <v-btn
+            color="primary"
+            prepend-icon="mdi-flash"
+            min-width="112"
+            :disabled="BUSY_STATES.includes(flashItem.flash.state) || !flashItem.drive"
+            @click="flashStore.flashDevice(flashItem)"
+          >
+            {{ $t('flash') }}
+          </v-btn>
+        </div>
+
+        <!-- -------------------- Edit form / flash details -------------------- -->
+
+        <v-expand-transition>
+          <div v-if="openId === flashItem.id">
+            <div v-if="flashItem.flash.state === 'idle'" class="device__body">
+              <div class="form-grid form-grid--3">
+                <div class="fld">
+                  <label class="fld__label" :for="`drive-${flashItem.id}`">
+                    {{ $t('select_drive') }}
+                  </label>
+                  <v-select
+                    :id="`drive-${flashItem.id}`"
+                    v-model="flashItem.drive"
+                    :items="drives"
+                    :item-title="(el: Drive) => `${el.device} · ${prettyBytes(el.size ?? 0)}`"
+                    :item-value="(el) => el"
+                    :no-data-text="$t('no_drives_available')"
+                    hide-details
+                  ></v-select>
+                </div>
+
+                <div v-if="flashItem.reswarm" class="fld">
+                  <label class="fld__label" :for="`hardware-${flashItem.id}`">
+                    {{ $t('choose_hardware') }}
+                  </label>
+                  <v-select
+                    :id="`hardware-${flashItem.id}`"
+                    :model-value="flashItem.reswarm.config!.board"
+                    @update:model-value="(board) => flashStore.selectBoard(flashItem, board)"
+                    @update:menu="(open: boolean) => open && boardStore.refresh()"
+                    :items="boards"
+                    :item-title="boardTitle"
+                    :item-value="(el) => el"
+                    :placeholder="$t('choose_board')"
+                    hide-details
+                  ></v-select>
+                </div>
+
+                <div v-if="flashItem.reswarm?.config" class="fld">
+                  <label class="fld__label" :for="`variant-${flashItem.id}`">
+                    {{ $t('choose_variant') }}
+                  </label>
+                  <v-select
+                    :id="`variant-${flashItem.id}`"
+                    :model-value="flashItem.reswarm.imageKey"
+                    @update:model-value="(key) => flashStore.selectVariant(flashItem, key)"
+                    :disabled="!flashItem.reswarm.config.board"
+                    :items="variantImages(flashItem.reswarm.config.board)"
+                    :item-title="variantTitle"
+                    :item-value="imageKey"
+                    :hint="variantHint(flashItem.reswarm.config.board)"
+                    persistent-hint
+                  ></v-select>
+                </div>
+              </div>
+
+              <div
                 v-if="
-                  flashItem.flash.state === 'finished' ||
-                  flashItem.flash.state === 'failed' ||
-                  flashItem.flash.state === 'flashing-canceled' ||
-                  flashItem.flash.state === 'verification-canceled'
+                  flashItem.reswarm?.config &&
+                  installerFor(flashItem.reswarm.config.board, flashItem.reswarm.imageKey)
                 "
+                class="fld"
               >
-                <v-icon left> mdi-refresh </v-icon>
-                {{ $t('try_again') }}
-              </v-btn>
+                <span :id="`install-${flashItem.id}`" class="fld__label">
+                  {{ $t('installation.method') }}
+                </span>
+                <div
+                  class="radio-cards"
+                  role="radiogroup"
+                  :aria-labelledby="`install-${flashItem.id}`"
+                >
+                  <label
+                    v-for="method in installMethods"
+                    :key="method.value"
+                    class="radio-card"
+                    :class="{
+                      'radio-card--on':
+                        (flashItem.reswarm.installerKey !== undefined ? 'installer' : 'direct') ===
+                        method.value
+                    }"
+                  >
+                    <input
+                      type="radio"
+                      :name="`install-${flashItem.id}`"
+                      :value="method.value"
+                      :checked="
+                        (flashItem.reswarm.installerKey !== undefined ? 'installer' : 'direct') ===
+                        method.value
+                      "
+                      @change="
+                        flashStore.selectInstallMethod(flashItem, method.value === 'installer')
+                      "
+                    />
+                    <span>{{ method.title }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <div v-if="flashItem.reswarm" class="form-grid form-grid--2">
+                <div class="fld">
+                  <label class="fld__label" :for="`ssid-${flashItem.id}`">
+                    {{ $t('specify_wlan_or_lan') }}
+                  </label>
+                  <v-combobox
+                    :id="`ssid-${flashItem.id}`"
+                    v-model="flashItem.reswarm.config!.wlanssid"
+                    item-title="ssid"
+                    item-value="ssid"
+                    :items="accessPoints"
+                    :return-object="false"
+                    hide-details
+                  ></v-combobox>
+                </div>
+
+                <div class="fld">
+                  <label class="fld__label" :for="`password-${flashItem.id}`">
+                    {{ $t('wlan_password') }}
+                  </label>
+                  <v-text-field
+                    :id="`password-${flashItem.id}`"
+                    v-model="flashItem.reswarm.config!.password"
+                    :append-inner-icon="flashItem.reswarm.showPassword ? 'mdi-eye' : 'mdi-eye-off'"
+                    :type="flashItem.reswarm.showPassword ? 'text' : 'password'"
+                    name="input-password"
+                    hide-details
+                    @click:append-inner="
+                      flashItem.reswarm.showPassword = !flashItem.reswarm.showPassword
+                    "
+                  ></v-text-field>
+                </div>
+              </div>
+            </div>
+
+            <div v-else class="device__body">
+              <FlashDisplay
+                v-if="PROGRESS_STATES.includes(flashItem.flash.state)"
+                :id="flashItem.id"
+              />
+
+              <div class="device__body-actions">
+                <v-btn
+                  v-if="flashItem.flash.state === 'flashing'"
+                  class="btn-secondary"
+                  variant="outlined"
+                  prepend-icon="mdi-cancel"
+                  @click="flashStore.cancelFlashing(flashItem)"
+                >
+                  {{ $t('cancel_writing') }}
+                </v-btn>
+                <v-btn
+                  v-if="flashItem.flash.state === 'verifying'"
+                  class="btn-secondary"
+                  variant="outlined"
+                  prepend-icon="mdi-skip-next"
+                  @click="flashStore.cancelFlashing(flashItem)"
+                >
+                  {{ $t('skip_verification') }}
+                </v-btn>
+
+                <v-spacer></v-spacer>
+
+                <v-btn
+                  v-if="RETRY_STATES.includes(flashItem.flash.state)"
+                  class="btn-secondary"
+                  variant="outlined"
+                  prepend-icon="mdi-refresh"
+                  @click="flashStore.reset(flashItem)"
+                >
+                  {{ $t('try_again') }}
+                </v-btn>
+              </div>
             </div>
           </div>
-        </v-expansion-panel-text>
-      </v-expansion-panel>
-    </v-expansion-panels>
-  </v-container>
+        </v-expand-transition>
+      </article>
+    </div>
+  </div>
 
   <Agent />
 </template>
-<style>
-.v-expansion-panel-title {
-  cursor: unset !important;
-  pointer-events: none;
-}
-
-.v-btn--disabled {
-  pointer-events: none !important;
-}
-
-.v-expansion-panel .v-btn {
-  pointer-events: auto;
-}
-
-.v-expansion-panel-title__overlay {
-  display: none !important;
-}
-
-.v-expansion-panels {
-  padding: 2px !important;
-}
-
-.v-expansion-panel-title {
-  display: block !important;
-}
-
-.v-expansion-panel-title__icon {
-  display: none !important;
-}
-
-.buttons-container {
+<style scoped>
+.page {
   display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--v-layout-top, 64px) - var(--v-layout-bottom, 40px));
+}
+
+.page-head {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 32px 16px;
+}
+
+.page-head__row {
+  display: flex;
+  align-items: flex-start;
   justify-content: space-between;
-  margin-top: 16px;
+  gap: 16px;
 }
 
-.infobox-container {
+.device-list {
   display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 2px 24px 24px 32px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
-.v-expansion-panels {
-  max-height: 325px;
-  overflow: auto;
+.device {
+  flex: none;
 }
-.header {
+
+.device__info {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) 40px;
+  gap: 16px;
+  align-items: start;
+  padding: 16px 12px 0 24px;
+}
+
+.device__remove {
+  grid-row: 1;
+  grid-column: 5;
+  margin-top: -4px;
+}
+
+.kv {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
-.mdi-plus {
-  color: white;
+.kv__k {
+  font: 500 12px/16px var(--font-sans);
+  color: var(--ink-400);
 }
 
-#device-list {
-  position: relative;
-  max-height: 80px;
-  overflow: visible;
+.kv__v {
+  overflow: hidden;
+  font: 500 14px/20px var(--font-sans);
+  color: var(--ink-900);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-#flash-button-wrapper {
-  position: fixed;
-  bottom: 42px;
-  left: 0px;
-  z-index: 4;
-  width: 100%;
+.kv__v--alert {
+  color: var(--red-600);
 }
 
-#auth-footnote {
-  font-size: 70%;
+.kv__s {
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-500);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-#flashButton {
-  padding-left: 80px;
-  margin-top: 13px;
-  margin-bottom: 13px;
-  width: 160px;
-  max-width: 160px;
-  display: inline-block;
-  /* position: absolute;
-  bottom: 33px;
-  right: 68px; */
+.kv .chip {
+  margin-top: 2px;
 }
 
-#removeButton {
-  position: absolute;
-  top: 4px;
-  right: -4px;
+.device__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
 }
 
-#transparentButton {
-  background-color: transparent;
+.device__status {
+  flex: 1;
+  min-width: 0;
+  padding: 0 12px;
 }
 
-#flashDeviceBar {
-  /* margin: 0px;
-  padding-bottom: 2px; */
-  position: absolute;
-  bottom: 4px;
-  left: 160px;
-  right: 160px;
-  /* width: 710px; */
-  /* align-content: center; */
-  /* width: 100%; */
+.device__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 24px 24px;
+  border-top: 1px solid var(--line-200);
 }
 
-.textHead {
-  /* font-size: 12px; */
-  font-weight: 500;
-  padding-bottom: 2px;
+.form-grid {
+  display: grid;
+  gap: 16px;
 }
 
-.textDesc {
-  /* font-size: 12px; */
-  line-height: 1.5;
+.form-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.textMain {
-  padding-top: 1px;
+.form-grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.textAlert {
-  color: #e62828;
+.device__body-actions {
+  display: flex;
+  gap: 8px;
 }
 
-.infoBox {
-  padding: 4px;
-  margin: 1px;
-  border-style: none;
-  border-width: 3px;
-  border-radius: 5px;
-}
-
-.infoBoxAlert {
-  border-style: dashed;
-  border-color: #e62828;
-  border-width: 2px;
-  border-radius: 0px;
-}
-
-.infoBoxA {
-  width: 190px;
-  max-width: 190px;
-  display: inline-block;
-}
-
-.infoBoxB {
-  width: 380px;
-  max-width: 380px;
-  display: inline-block;
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: all 0.3s;
-}
-.fade-enter, .fade-leave-to /* .fade-leave-active below version 2.1.8 */ {
-  opacity: 0;
-  transform: translateY(50px);
-}
-
-.bar-prog {
-  pointer-events: none;
+.device__body-actions:empty {
+  display: none;
 }
 </style>

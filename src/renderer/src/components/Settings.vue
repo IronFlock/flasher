@@ -15,9 +15,13 @@ const { storage: darkMode } = useLocalStorage('darkMode', false, true)
 const { storage: language } = useLocalStorage('language', 'English', true)
 
 i18nLocale.locale.value = langLocaleMap[language.value]
-watch(darkMode, (newVal) => {
-  theme.global.name.value = newVal ? 'dark' : 'light'
-})
+watch(
+  darkMode,
+  (newVal) => {
+    theme.global.name.value = newVal ? 'dark' : 'light'
+  },
+  { immediate: true }
+)
 
 watch(language, (newVal) => {
   i18nLocale.locale.value = langLocaleMap[newVal]
@@ -25,34 +29,61 @@ watch(language, (newVal) => {
 </script>
 
 <template>
-  <v-container>
-    <v-list-item>
-      <v-toolbar-title>
-        {{ $t('settings') }}
-      </v-toolbar-title>
+  <div class="drawer">
+    <div class="panel-head">
+      <div>
+        <h2 class="t-heading">{{ $t('settings') }}</h2>
+        <p class="t-meta">{{ $t('settings_subtitle') }}</p>
+      </div>
+    </div>
 
-      <v-list-item-subtitle>
-        {{ $t('settings_subtitle') }}
-      </v-list-item-subtitle>
-    </v-list-item>
-
-    <v-divider></v-divider>
-
-    <v-list>
-      <v-list-item>
+    <div class="list-card">
+      <div class="row">
+        <label class="row__text row__title" for="settings-language">
+          {{ $t('choose_language') }}
+        </label>
         <v-select
-          hide-details
+          id="settings-language"
           v-model="language"
-          :label="$t('choose_language')"
+          class="settings__select"
           :items="availableLanguages"
-          item-value="value"
-          item-text="text"
-          variant="underlined"
+          hide-details
         ></v-select>
-      </v-list-item>
-      <v-list-item>
-        <v-switch color="primary" v-model="darkMode" :label="`${$t('dark_mode')}`"></v-switch>
-      </v-list-item>
-    </v-list>
-  </v-container>
+      </div>
+      <div class="row">
+        <label class="row__text row__title" for="settings-dark-mode">
+          {{ $t('dark_mode') }}
+        </label>
+        <v-switch
+          id="settings-dark-mode"
+          v-model="darkMode"
+          color="success"
+          density="compact"
+          inset
+          hide-details
+        ></v-switch>
+      </div>
+    </div>
+  </div>
 </template>
+<style scoped>
+.drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px 16px;
+}
+
+.panel-head {
+  padding-left: 4px;
+}
+
+.settings__select {
+  flex: none;
+  width: 148px;
+}
+
+.row .v-switch {
+  flex: none;
+}
+</style>

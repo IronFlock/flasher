@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useFlashStore } from '@renderer/store/flash'
 import { storeToRefs } from 'pinia'
+import { computed } from 'vue'
 
 const props = defineProps({
   id: Number
@@ -9,93 +10,76 @@ const props = defineProps({
 const flashStore = useFlashStore()
 const { flashItemById } = storeToRefs(flashStore)
 
-const flashItem = flashItemById.value(props.id ?? 0)
+const flashItem = computed(() => flashItemById.value(props.id ?? 0))
+const state = computed(() => flashItem.value?.flash.state)
+
+// Final states as status chips: always dot + word (design spec §2.5).
+const result = computed(() => {
+  switch (state.value) {
+    case 'finished':
+      return { tone: 'online', text: 'ready_to_use' }
+    case 'verification-canceled':
+      return { tone: 'online', text: 'verification_canceled' }
+    case 'failed':
+      return { tone: 'offline', text: 'flashing_failed' }
+    case 'flashing-canceled':
+      return { tone: 'offline', text: 'flashing_canceled' }
+    default:
+      return undefined
+  }
+})
+
+const measured = computed(() =>
+  ['flashing', 'verifying', 'decompressing', 'downloading'].includes(state.value ?? '')
+)
+const waiting = computed(() => ['configuring', 'starting'].includes(state.value ?? ''))
+const percent = computed(() => Math.min(100, Math.max(0, flashItem.value?.flash.progress ?? 0)))
 </script>
 <template>
-  <div class="container">
-    <!-- -------------------- final flash result -------------------- -->
+  <div class="flash-state" role="status">
+    <span v-if="result" class="chip" :class="`chip--${result.tone}`">
+      <span class="dot"></span>
+      {{ $t(result.text) }}
+    </span>
 
-    <div class="flashSeg">
-      <v-alert
-        v-if="flashItem?.flash.state === 'finished'"
-        class="ma-0 mp-0 text-center"
-        type="success"
-        density="compact"
-      >
-        {{ $t('ready_to_use') }}
-      </v-alert>
-      <v-alert
-        class="ma-0 mp-0 text-center"
-        type="error"
-        density="compact"
-        v-if="flashItem?.flash.state === 'failed'"
-      >
-        {{ $t('flashing_failed') }}
-      </v-alert>
-      <v-alert
-        class="ma-0 mp-0 text-center"
-        type="info"
-        color="error"
-        density="compact"
-        v-if="flashItem?.flash.state === 'flashing-canceled'"
-      >
-        {{ $t('flashing_canceled') }}
-      </v-alert>
-      <v-alert
-        class="ma-0 mp-0 text-center"
-        type="success"
-        density="compact"
-        v-if="flashItem?.flash.state === 'verification-canceled'"
-      >
-        {{ $t('verification_canceled') }}
-      </v-alert>
-    </div>
-
-    <!-- -------------------- flash process -------------------- -->
-
-    <div
-      class="flashSeg"
-      v-if="
-        flashItem?.flash.state == 'flashing' ||
-        flashItem?.flash.state == 'verifying' ||
-        flashItem?.flash.state == 'decompressing' ||
-        flashItem?.flash.state == 'downloading' ||
-        flashItem?.flash.state == 'extracting-iso' ||
-        flashItem?.flash.state == 'recreating-iso'
-      "
-    >
+    <template v-else-if="measured || waiting">
+      <div class="flash-state__label">
+        <span>{{ $t(`flashing_state.${state}`) }}</span>
+        <span v-if="measured" class="num">{{ percent.toFixed(1) }} %</span>
+      </div>
+      <div v-if="measured" class="meter">
+        <div class="meter__fill" :style="{ width: `${percent}%` }"></div>
+      </div>
       <v-progress-linear
-        class="flash-prog"
-        v-model="flashItem.flash.progress"
-        color="secondary"
+        v-else
+        indeterminate
+        color="primary"
+        bg-color="surface-light"
+        bg-opacity="1"
+        height="6"
         rounded
-        height="40"
-      >
-        {{
-          flashItem?.flash.progress.toFixed(1) +
-          ' % ' +
-          $t(`flashing_state.${flashItem?.flash.state}`)
-        }}
-      </v-progress-linear>
-    </div>
-
-    <div
-      class="flashSeg"
-      v-if="flashItem?.flash.state == 'configuring' || flashItem?.flash.state == 'starting'"
-    >
-      <v-progress-linear class="flash-prog" indeterminate color="secondary" rounded height="40">
-        {{ $t(`flashing_state.${flashItem?.flash.state}`) }}
-      </v-progress-linear>
-    </div>
+      ></v-progress-linear>
+    </template>
   </div>
 </template>
-<style>
-.container {
-  width: 100%;
-  margin-left: auto;
-  margin-bottom: 12px;
-  padding-right: 34px;
-  padding-left: 34px;
-  margin-right: auto;
+<style scoped>
+.flash-state {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+}
+
+.flash-state > .chip {
+  align-self: center;
+}
+
+.flash-state__label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font: 500 13px/18px var(--font-sans);
+  color: var(--ink-700);
 }
 </style>

@@ -1,16 +1,21 @@
 import { BrowserWindow, OpenDialogOptions, dialog, ipcMain } from 'electron'
-import { FlashItem, RPC, imageTypes } from '../types'
+import { FlashItem, RPC } from '../types'
 import { automountDrive, listDrives, listPartitions, unmountDisk } from '../main/api/drives'
 import { scanner } from 'etcher-sdk'
 import { readFile, stat } from 'fs/promises'
 import path from 'path'
 import { scanNetworks } from './api/wifi'
-import { cancelFlashing, flashDevice, imageManager } from './api/flash'
+import { cancelFlashing, catalogStore, flashDevice } from './api/flash'
 import { isSudoPasswordSet, setSudoPassword } from './api/permissions'
 import { Drive } from 'drivelist'
 import { agentManager, hasDocker } from './api/agent'
 import { autoUpdater } from 'electron-updater'
-import { assertValidDevicePath, assertValidReswarmConfig } from './security/validation'
+import {
+  assertFlashRequest,
+  assertValidDevicePath,
+  assertValidReswarmConfig
+} from './security/validation'
+import { FILE_DIALOG_EXTENSIONS } from '../shared/images'
 
 // Config files the renderer is allowed to read back through RPC.ReadFile.
 const READABLE_CONFIG_EXTENSIONS = ['.flock', '.reswarm']
@@ -85,7 +90,12 @@ function handleChooseFile(mainWindow: BrowserWindow) {
   const options: OpenDialogOptions = {
     title: 'Select file',
     defaultPath: process.env.HOME + '/Downloads',
-    filters: [{ name: '.flock, .img, .iso, .reswarm', extensions: [...imageTypes] }],
+    filters: [
+      {
+        name: 'Device files (.flock, .reswarm)',
+        extensions: FILE_DIALOG_EXTENSIONS
+      }
+    ],
     properties: ['openFile', 'multiSelections']
   }
 
@@ -112,8 +122,12 @@ async function handleReadFile(_, filePath: string) {
   return readFile(filePath, { encoding: 'utf8' })
 }
 
-function handleSupportedBoards() {
-  return imageManager.downloadSupportedBoards()
+// The boards of the signed FlockOS catalog, fetched and verified again when
+// the last load is more than 5 minutes old, or now with `force` (a retry).
+// A catalog that does not verify comes back as an error, with the boards
+// verified before, if any.
+function handleSupportedBoards(force: unknown) {
+  return catalogStore.refresh({ force: force === true })
 }
 
 function handleWifiScan() {
@@ -121,14 +135,12 @@ function handleWifiScan() {
 }
 
 async function handleFlashDevice(_, mainWindow: BrowserWindow, flashItem: FlashItem) {
-  if (!flashItem || typeof flashItem.fullPath !== 'string') {
-    throw new Error('Invalid flash item')
-  }
+  // A device file and the key of a FlockOS catalog image, nothing else: no
+  // local image file, path or URL. The image is resolved, downloaded and
+  // checked from the verified catalog in flashDevice.
+  assertFlashRequest(flashItem)
   // Flash the trusted, freshly enumerated drive object, not the renderer-supplied one.
   flashItem.drive = await assertFlashableDrive(flashItem.drive)
-  if (flashItem.reswarm?.config) {
-    assertValidReswarmConfig(flashItem.reswarm.config)
-  }
 
   return flashDevice(flashItem, (progress) => {
     mainWindow.webContents.send('flash-progress', { progress, id: flashItem.id })
@@ -207,7 +219,7 @@ export function setupIpcHandlers(mainWindow: BrowserWindow) {
   ipcMain.handle(RPC.Mount, handleMount)
   ipcMain.handle(RPC.ChooseFile, () => handleChooseFile(mainWindow))
   ipcMain.handle(RPC.ReadFile, handleReadFile)
-  ipcMain.handle(RPC.GetSupportedBoards, handleSupportedBoards)
+  ipcMain.handle(RPC.GetSupportedBoards, (_, force) => handleSupportedBoards(force))
   ipcMain.handle(RPC.ScanWifi, handleWifiScan)
   ipcMain.handle(RPC.FlashDevice, (_, flashItem) => handleFlashDevice(_, mainWindow, flashItem))
   ipcMain.handle(RPC.SetSudoPassword, (_, password) => handleSetSudoPassword(password))
