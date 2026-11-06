@@ -158,25 +158,25 @@ watch(drives, (updatedDl) => {
         <!-- -------------------- What gets flashed where -------------------- -->
 
         <div class="device__info">
-          <div v-if="flashItem.reswarm" class="kv">
+          <div v-if="flashItem.flock" class="kv">
             <span class="kv__k">{{ $t('device') }}</span>
             <span class="kv__v">
-              {{ cutInfoString(flashItem.reswarm?.config?.name ?? '', 28, $t('no_device_name')) }}
+              {{ cutInfoString(flashItem.flock?.config?.name ?? '', 28, $t('no_device_name')) }}
             </span>
             <span class="kv__s">
-              {{ cutInfoString(flashItem.reswarm?.config?.description ?? '', 32, '') }}
+              {{ cutInfoString(flashItem.flock?.config?.description ?? '', 32, '') }}
             </span>
           </div>
 
-          <div v-if="flashItem.reswarm" class="kv">
+          <div v-if="flashItem.flock" class="kv">
             <span class="kv__k">{{ $t('swarm') }}</span>
             <span class="kv__v">
-              {{ cutInfoString(flashItem.reswarm?.config?.swarm_name ?? '', 28, $t('no_swarm')) }}
+              {{ cutInfoString(flashItem.flock?.config?.swarm_name ?? '', 28, $t('no_swarm')) }}
             </span>
             <span class="kv__s">
               {{
                 cutInfoString(
-                  flashItem.reswarm?.config?.swarm_owner_name ?? '',
+                  flashItem.flock?.config?.swarm_owner_name ?? '',
                   32,
                   $t('no_swarm_owner')
                 )
@@ -201,14 +201,14 @@ watch(drives, (updatedDl) => {
             </template>
           </div>
 
-          <div v-if="flashItem.reswarm" class="kv">
+          <div v-if="flashItem.flock" class="kv">
             <span class="kv__k">{{ $t('board') }}</span>
-            <template v-if="flashItem.reswarm.config!.board">
+            <template v-if="flashItem.flock.config!.board">
               <span class="kv__v">
-                {{ cutInfoString(flashItem.reswarm.config!.board.modelname, 28) }}
+                {{ cutInfoString(flashItem.flock.config!.board.modelname, 28) }}
               </span>
               <span>
-                <span class="chip">{{ flashItem.reswarm.config!.board.architecture }}</span>
+                <span class="chip">{{ flashItem.flock.config!.board.architecture }}</span>
               </span>
             </template>
             <span v-else class="kv__v kv__v--alert">{{ $t('choose_board') }}</span>
@@ -246,7 +246,7 @@ watch(drives, (updatedDl) => {
           </div>
 
           <v-btn
-            v-if="flashItem.reswarm && flashItem.flash.state === 'idle'"
+            v-if="flashItem.flock && flashItem.flash.state === 'idle'"
             class="btn-secondary"
             variant="outlined"
             prepend-icon="mdi-play-outline"
@@ -288,13 +288,13 @@ watch(drives, (updatedDl) => {
                   ></v-select>
                 </div>
 
-                <div v-if="flashItem.reswarm" class="fld">
+                <div v-if="flashItem.flock" class="fld">
                   <label class="fld__label" :for="`hardware-${flashItem.id}`">
                     {{ $t('choose_hardware') }}
                   </label>
                   <v-select
                     :id="`hardware-${flashItem.id}`"
-                    :model-value="flashItem.reswarm.config!.board"
+                    :model-value="flashItem.flock.config!.board"
                     @update:model-value="(board) => flashStore.selectBoard(flashItem, board)"
                     @update:menu="(open: boolean) => open && boardStore.refresh()"
                     :items="boards"
@@ -305,19 +305,19 @@ watch(drives, (updatedDl) => {
                   ></v-select>
                 </div>
 
-                <div v-if="flashItem.reswarm?.config" class="fld">
+                <div v-if="flashItem.flock?.config" class="fld">
                   <label class="fld__label" :for="`variant-${flashItem.id}`">
                     {{ $t('choose_variant') }}
                   </label>
                   <v-select
                     :id="`variant-${flashItem.id}`"
-                    :model-value="flashItem.reswarm.imageKey"
+                    :model-value="flashItem.flock.imageKey"
                     @update:model-value="(key) => flashStore.selectVariant(flashItem, key)"
-                    :disabled="!flashItem.reswarm.config.board"
-                    :items="variantImages(flashItem.reswarm.config.board)"
+                    :disabled="!flashItem.flock.config.board"
+                    :items="variantImages(flashItem.flock.config.board)"
                     :item-title="variantTitle"
                     :item-value="imageKey"
-                    :hint="variantHint(flashItem.reswarm.config.board)"
+                    :hint="variantHint(flashItem.flock.config.board)"
                     persistent-hint
                   ></v-select>
                 </div>
@@ -325,8 +325,8 @@ watch(drives, (updatedDl) => {
 
               <div
                 v-if="
-                  flashItem.reswarm?.config &&
-                  installerFor(flashItem.reswarm.config.board, flashItem.reswarm.imageKey)
+                  flashItem.flock?.config &&
+                  installerFor(flashItem.flock.config.board, flashItem.flock.imageKey)
                 "
                 class="fld"
               >
@@ -344,7 +344,7 @@ watch(drives, (updatedDl) => {
                     class="radio-card"
                     :class="{
                       'radio-card--on':
-                        (flashItem.reswarm.installerKey !== undefined ? 'installer' : 'direct') ===
+                        (flashItem.flock.installerKey !== undefined ? 'installer' : 'direct') ===
                         method.value
                     }"
                   >
@@ -353,7 +353,7 @@ watch(drives, (updatedDl) => {
                       :name="`install-${flashItem.id}`"
                       :value="method.value"
                       :checked="
-                        (flashItem.reswarm.installerKey !== undefined ? 'installer' : 'direct') ===
+                        (flashItem.flock.installerKey !== undefined ? 'installer' : 'direct') ===
                         method.value
                       "
                       @change="
@@ -365,14 +365,14 @@ watch(drives, (updatedDl) => {
                 </div>
               </div>
 
-              <div v-if="flashItem.reswarm" class="form-grid form-grid--2">
+              <div v-if="flashItem.flock" class="form-grid form-grid--2">
                 <div class="fld">
                   <label class="fld__label" :for="`ssid-${flashItem.id}`">
                     {{ $t('specify_wlan_or_lan') }}
                   </label>
                   <v-combobox
                     :id="`ssid-${flashItem.id}`"
-                    v-model="flashItem.reswarm.config!.wlanssid"
+                    v-model="flashItem.flock.config!.wlanssid"
                     item-title="ssid"
                     item-value="ssid"
                     :items="accessPoints"
@@ -387,13 +387,13 @@ watch(drives, (updatedDl) => {
                   </label>
                   <v-text-field
                     :id="`password-${flashItem.id}`"
-                    v-model="flashItem.reswarm.config!.password"
-                    :append-inner-icon="flashItem.reswarm.showPassword ? 'mdi-eye' : 'mdi-eye-off'"
-                    :type="flashItem.reswarm.showPassword ? 'text' : 'password'"
+                    v-model="flashItem.flock.config!.password"
+                    :append-inner-icon="flashItem.flock.showPassword ? 'mdi-eye' : 'mdi-eye-off'"
+                    :type="flashItem.flock.showPassword ? 'text' : 'password'"
                     name="input-password"
                     hide-details
                     @click:append-inner="
-                      flashItem.reswarm.showPassword = !flashItem.reswarm.showPassword
+                      flashItem.flock.showPassword = !flashItem.flock.showPassword
                     "
                   ></v-text-field>
                 </div>

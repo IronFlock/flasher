@@ -195,7 +195,7 @@ describe('CatalogStore', () => {
     await expect(s.resolve('flockos-amd64-efi-base@0.9.0')).rejects.toThrow(
       /not in the signed FlockOS catalog/
     )
-    await expect(s.resolve('ReswarmOS-image-0.5.7-raspberrypi4.img.gz')).rejects.toThrow(
+    await expect(s.resolve('flockos-raspberrypi4-base-0.10.0.img.gz')).rejects.toThrow(
       /not in the signed FlockOS catalog/
     )
     await expect(s.resolve('https://evil/x.img.gz')).rejects.toThrow(/not in the signed/)

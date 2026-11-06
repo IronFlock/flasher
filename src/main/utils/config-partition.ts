@@ -74,14 +74,14 @@ export const chooseConfigPartition = (partitions: PartitionInfo[]): PartitionCho
   return undefined
 }
 
-// The name the device file gets on the partition: <name>.flock, also for a
-// .reswarm file (FlockOS reads *.flock only). Nothing else is written; enroll
+// The name the device file gets on the partition: <name>.flock (FlockOS reads
+// *.flock only), made valid on FAT. Nothing else is written; enroll
 // removes the .flock after use, so no copy with the device's credentials stays.
 export const configFileName = (sourcePath: string): string => {
   const base = sourcePath.split(/[\\/]/).pop() ?? ''
   const stem =
     base
-      .replace(/\.(flock|reswarm)$/i, '')
+      .replace(/\.flock$/i, '')
       // eslint-disable-next-line no-control-regex
       .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_')
       .replace(/[. ]+$/, '') || 'device'
@@ -135,11 +135,11 @@ export const parseLsblk = (stdout: string): PartitionInfo[] => {
 
 // The partition identifiers (disk4s1, ...) of `diskutil list /dev/disk4`.
 export const parseDiskutilList = (stdout: string, disk: string): string[] => {
-  const pattern = new RegExp(`^${disk}s\\d+$`)
+  const prefix = `${disk}s`
   return stdout
     .split('\n')
     .map((line) => line.trim().split(/\s+/).pop() ?? '')
-    .filter((id) => pattern.test(id))
+    .filter((id) => id.startsWith(prefix) && /^\d+$/.test(id.slice(prefix.length)))
 }
 
 // `diskutil info` prints "   Key:   value" lines.
@@ -306,7 +306,7 @@ const mountLinux = async (device: string, deps: MountDeps): Promise<MountedConfi
       }
     }
   } catch (error) {
-    console.warn(`udisksctl could not mount ${block}; mounting it directly:`, error)
+    console.warn('udisksctl could not mount %s; mounting it directly:', block, error)
   }
 
   if (!deps.makeTempDir) throw new Error(`Cannot mount ${block}`)

@@ -1,0 +1,33 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://github.com/IronFlock/flasher/security/vex.openvex.json",
+  "author": "IronFlock",
+  "timestamp": "2026-11-06T00:00:00Z",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": { "name": "CVE-2026-31808", "aliases": ["GHSA-5v7r-6r5c-r473"] },
+      "products": [{ "@id": "pkg:github/IronFlock/flasher" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_cannot_be_controlled_by_adversary",
+      "impact_statement": "file-type 16.5.4 (via etcher-sdk; endless loop in the ASF parser on malformed input). etcher-sdk runs it (fromStream in source-destination.js) only on the image being flashed, and FlockFlasher flashes nothing but images of the signed FlockOS catalog, after checking the download's size and SHA-256 against it (src/main/security/catalog.ts, integrity.ts). The fix (21.3.1) is ESM-only, which etcher-sdk's require() cannot load; drop this when etcher-sdk moves on.",
+      "timestamp": "2026-11-06T00:00:00Z"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-118773", "aliases": ["GHSA-3g3m-2fjr-6pw4"] },
+      "products": [{ "@id": "pkg:github/IronFlock/flasher" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "glob 10.5.0 (AbortSignal cancellation bypass) is a declared dependency of etcher-sdk, but etcher-sdk's build never loads it (no require of glob under node_modules/etcher-sdk/build), and FlockFlasher does not use glob either. Drop this when etcher-sdk updates or removes it.",
+      "timestamp": "2026-11-06T00:00:00Z"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-118764", "aliases": ["GHSA-g3hv-75wg-m249"] },
+      "products": [{ "@id": "pkg:github/IronFlock/flasher" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_cannot_be_controlled_by_adversary",
+      "impact_statement": "minimatch (denial of service through a crafted glob pattern). 9.0.9 is a declared dependency of etcher-sdk (and of its glob) that etcher-sdk's build never loads; 10.2.6 belongs to the build tooling only and is not shipped. Neither ever sees a pattern an attacker supplies: the only patterns are the repository's own build configuration. Drop this when etcher-sdk updates or removes it.",
+      "timestamp": "2026-11-06T00:00:00Z"
+    }
+  ]
+}

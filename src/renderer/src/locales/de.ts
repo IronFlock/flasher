@@ -102,10 +102,11 @@ export default {
     'Um das Gerät auf Ihrem lokalen Computer testen zu können, müssen Sie den IronFlock Device Agent herunterladen.',
   agent_update_available:
     'Ein Update für den IronFlock Device Agent ist verfügbar! Fahren Sie mit dem Herunterladen des Updates fort.',
-  docker_is_required:
-    '<strong>Docker ist erforderlich</strong>, um Ihr Record Evolution Gerät zu testen',
+  docker_is_required: '{required}, um Ihr IronFlock-Gerät zu testen',
+  docker_is_required_strong: 'Docker ist erforderlich',
   make_sure_docker_is_running:
-    'Wenn Sie Docker bereits installiert haben, stellen Sie sicher, dass der <strong>Docker Daemon</strong> im Hintergrund läuft.',
+    'Wenn Sie Docker bereits installiert haben, stellen Sie sicher, dass der {daemon} im Hintergrund läuft.',
+  docker_daemon: 'Docker Daemon',
   docker_please_follow_instructions:
     'Bitte folgen Sie den Anweisungen {anchor} um Docker zu installieren.',
   improve_flash_performance: 'Den Flashingprozess verbessern',

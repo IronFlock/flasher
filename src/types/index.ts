@@ -78,7 +78,7 @@ export type BoardCatalogs = {
   flockos: FlockOSCatalogStatus
 }
 
-export type ReswarmConfig = {
+export type FlockConfig = {
   name: string
   // Today's .flock files carry no board; FlockFlasher sets the one chosen.
   board?: SupportedBoard
@@ -137,9 +137,9 @@ export type AgentDownloadStatus = { state: AgentDownloadState; progress?: Partia
 export type FlashItem = {
   id: number
   fullPath: string
-  reswarm?: {
+  flock?: {
     configPath?: string
-    config?: ReswarmConfig
+    config?: FlockConfig
     board?: SupportedBoard
     // imageKey (src/shared/images.ts) of the variant chosen from the board.
     imageKey?: string

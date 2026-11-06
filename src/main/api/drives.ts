@@ -3,8 +3,28 @@ import { elevatedNodeChildProcess, elevatedSpawn, spawnAsync } from './permissio
 import { UNMOUNT_SCRIPT } from '../security/elevated-scripts'
 import { getNodeModulesResourcePath } from '../utils'
 
+// drivelist calls still running on the libuv thread pool. One that returns
+// while Electron tears the main process down aborts the app: drivelist cannot
+// hand its result to JS any more and throws a Napi::Error nothing catches
+// (SIGABRT, "terminating due to uncaught exception of type Napi::Error"). The
+// quit therefore waits for them (whenDrivelistIdle).
+const drivelistCalls = new Set<Promise<unknown>>()
+
+export function trackDrivelistCall<T>(call: Promise<T>): Promise<T> {
+  drivelistCalls.add(call)
+  const done = () => drivelistCalls.delete(call)
+  call.then(done, done)
+  return call
+}
+
+export async function whenDrivelistIdle(): Promise<void> {
+  while (drivelistCalls.size > 0) {
+    await Promise.allSettled([...drivelistCalls])
+  }
+}
+
 export async function listDrives() {
-  const drives = await listdrives()
+  const drives = await trackDrivelistCall(listdrives())
   return drives.filter((d) => d.busType !== 'UNKNOWN' && !d.isSystem && !d.isReadOnly)
 }
 

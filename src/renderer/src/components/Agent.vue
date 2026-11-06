@@ -22,12 +22,13 @@ watch(logs, () => {
           <v-icon size="20">mdi-console</v-icon>
         </span>
         <h2 class="dlg__title">
-          {{ $t('agent.currently_running', { name: activeItem?.reswarm?.config?.name }) }}
+          {{ $t('agent.currently_running', { name: activeItem?.flock?.config?.name }) }}
         </h2>
       </div>
 
       <v-card-text class="dlg__body">
         <div ref="logger" class="terminal">
+          <!-- nosemgrep: javascript.vue.security.audit.xss.templates.avoid-v-html.avoid-v-html -- ansi-to-html HTML-escapes each log line (escapeXML, store/agent.ts) before it adds the colour spans -->
           <div v-html="item" v-for="(item, index) in logs" :key="index"></div>
         </div>
       </v-card-text>
@@ -62,7 +63,11 @@ watch(logs, () => {
       </div>
 
       <div class="dlg__body docker__body">
-        <p v-html="$t('docker_is_required')"></p>
+        <i18n-t keypath="docker_is_required" tag="p">
+          <template v-slot:required>
+            <strong>{{ $t('docker_is_required_strong') }}</strong>
+          </template>
+        </i18n-t>
         <i18n-t keypath="docker_please_follow_instructions" tag="p">
           <template v-slot:anchor>
             <a href="https://docs.docker.com/get-docker/" target="_blank">{{
@@ -70,7 +75,11 @@ watch(logs, () => {
             }}</a>
           </template>
         </i18n-t>
-        <p v-html="$t('make_sure_docker_is_running')"></p>
+        <i18n-t keypath="make_sure_docker_is_running" tag="p">
+          <template v-slot:daemon>
+            <strong>{{ $t('docker_daemon') }}</strong>
+          </template>
+        </i18n-t>
       </div>
     </v-card>
   </v-dialog>

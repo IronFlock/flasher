@@ -1,6 +1,12 @@
 import { BrowserWindow, OpenDialogOptions, dialog, ipcMain } from 'electron'
 import { FlashItem, RPC } from '../types'
-import { automountDrive, listDrives, listPartitions, unmountDisk } from '../main/api/drives'
+import {
+  automountDrive,
+  listDrives,
+  listPartitions,
+  trackDrivelistCall,
+  unmountDisk
+} from '../main/api/drives'
 import { scanner } from 'etcher-sdk'
 import { readFile, stat } from 'fs/promises'
 import path from 'path'
@@ -13,12 +19,12 @@ import { autoUpdater } from 'electron-updater'
 import {
   assertFlashRequest,
   assertValidDevicePath,
-  assertValidReswarmConfig
+  assertValidFlockConfig
 } from './security/validation'
 import { FILE_DIALOG_EXTENSIONS } from '../shared/images'
 
 // Config files the renderer is allowed to read back through RPC.ReadFile.
-const READABLE_CONFIG_EXTENSIONS = ['.flock', '.reswarm']
+const READABLE_CONFIG_EXTENSIONS = ['.flock']
 // Cap on a config file read so a malicious path can't stream a huge file into memory.
 const MAX_CONFIG_READ_BYTES = 5 * 1024 * 1024
 
@@ -35,6 +41,14 @@ async function assertFlashableDrive(drive: Drive | undefined): Promise<Drive> {
     throw new Error(`Selected drive is not an available removable drive: ${device}`)
   }
   return match
+}
+
+// Push an event to the renderer. The scanner, the agent and the updater go on
+// emitting while the app quits, after the window has closed, and a send to a
+// destroyed window throws "Object has been destroyed" in the main process.
+export function sendToRenderer(window: BrowserWindow, channel: string, payload: unknown) {
+  if (window.isDestroyed() || window.webContents.isDestroyed()) return
+  window.webContents.send(channel, payload)
 }
 
 function handleListDrives() {
@@ -56,11 +70,35 @@ function handleGetPlatform() {
   return process.platform
 }
 
+// etcher-sdk's BlockDeviceAdapter lists the drives every second, and its stop()
+// only clears a flag: a drivelist call already running goes on running. Its
+// (private) listDrives is wrapped so the quit can wait for that call as well
+// (trackDrivelistCall in api/drives.ts says why it must).
+function trackScans(adapter: scanner.adapters.BlockDeviceAdapter) {
+  const scans = adapter as unknown as { listDrives?: () => Promise<unknown> }
+  const listDrives = scans.listDrives?.bind(adapter)
+  if (!listDrives) {
+    console.error('etcher-sdk BlockDeviceAdapter has no listDrives: a quit during a scan may abort')
+    return adapter
+  }
+  scans.listDrives = () => trackDrivelistCall(listDrives())
+  return adapter
+}
+
+let deviceScanner: scanner.Scanner | undefined
+
+export function stopDriveScanner() {
+  deviceScanner?.stop()
+  deviceScanner = undefined
+}
+
 function handleDriveScanner(mainWindow: BrowserWindow) {
   const adapters: scanner.adapters.Adapter[] = [
-    new scanner.adapters.BlockDeviceAdapter({
-      includeSystemDrives: () => true
-    }),
+    trackScans(
+      new scanner.adapters.BlockDeviceAdapter({
+        includeSystemDrives: () => true
+      })
+    ),
     new scanner.adapters.UsbbootDeviceAdapter()
   ]
   if (process.platform === 'win32') {
@@ -68,20 +106,20 @@ function handleDriveScanner(mainWindow: BrowserWindow) {
       adapters.push(new scanner.adapters.DriverlessDeviceAdapter())
     }
   }
-  const deviceScanner = new scanner.Scanner(adapters)
+  deviceScanner = new scanner.Scanner(adapters)
   deviceScanner.on('attach', async (drive: scanner.adapters.AdapterSourceDestination) => {
-    mainWindow.webContents.send('drive-scanner-attach', drive)
+    sendToRenderer(mainWindow, 'drive-scanner-attach', drive)
     if (drive.emitsProgress) {
       drive.on('progress', (progress: number) => {
-        mainWindow.webContents.send('drive-scanner-progress', { drive, progress })
+        sendToRenderer(mainWindow, 'drive-scanner-progress', { drive, progress })
       })
     }
   })
   deviceScanner.on('detach', (drive: scanner.adapters.AdapterSourceDestination) => {
-    mainWindow.webContents.send('drive-scanner-detach', drive)
+    sendToRenderer(mainWindow, 'drive-scanner-detach', drive)
   })
   deviceScanner.on('error', (error: Error) => {
-    mainWindow.webContents.send('drive-scanner-error', error)
+    sendToRenderer(mainWindow, 'drive-scanner-error', error)
   })
   deviceScanner.start()
 }
@@ -92,7 +130,7 @@ function handleChooseFile(mainWindow: BrowserWindow) {
     defaultPath: process.env.HOME + '/Downloads',
     filters: [
       {
-        name: 'Device files (.flock, .reswarm)',
+        name: 'Device files (.flock)',
         extensions: FILE_DIALOG_EXTENSIONS
       }
     ],
@@ -103,7 +141,7 @@ function handleChooseFile(mainWindow: BrowserWindow) {
 }
 
 // Scoped config reader. This used to be an arbitrary-file-read primitive exposed
-// to the renderer; it now only reads .flock/.reswarm config files, as utf8, with a
+// to the renderer; it now only reads .flock config files, as utf8, with a
 // size cap — the sole legitimate use (parsing the config being flashed).
 async function handleReadFile(_, filePath: string) {
   if (typeof filePath !== 'string' || filePath.length === 0) {
@@ -143,34 +181,34 @@ async function handleFlashDevice(_, mainWindow: BrowserWindow, flashItem: FlashI
   flashItem.drive = await assertFlashableDrive(flashItem.drive)
 
   return flashDevice(flashItem, (progress) => {
-    mainWindow.webContents.send('flash-progress', { progress, id: flashItem.id })
+    sendToRenderer(mainWindow, 'flash-progress', { progress, id: flashItem.id })
   })
 }
 
 function handleAgentEvents(mainWindow: BrowserWindow) {
   agentManager.on('logs', (logs) => {
-    mainWindow.webContents.send('agent-logs', { logs })
+    sendToRenderer(mainWindow, 'agent-logs', { logs })
   })
 
   agentManager.on('state', ({ activeItem, state }) => {
-    mainWindow.webContents.send('agent-state', { activeItem, state })
+    sendToRenderer(mainWindow, 'agent-state', { activeItem, state })
   })
 
   agentManager.on('download-progress', ({ progress, state }) => {
-    mainWindow.webContents.send('agent-download-progress', { progress, state })
+    sendToRenderer(mainWindow, 'agent-download-progress', { progress, state })
   })
 }
 
 async function handleTestDevice(flashItem: FlashItem) {
-  const configPath = flashItem?.reswarm?.configPath
+  const configPath = flashItem?.flock?.configPath
   if (
     typeof configPath !== 'string' ||
     !READABLE_CONFIG_EXTENSIONS.includes(path.extname(configPath).toLowerCase())
   ) {
     throw new Error('Invalid or missing device config path')
   }
-  if (flashItem.reswarm?.config) {
-    assertValidReswarmConfig(flashItem.reswarm.config)
+  if (flashItem.flock?.config) {
+    assertValidFlockConfig(flashItem.flock.config)
   }
   return agentManager.startAgent(flashItem)
 }

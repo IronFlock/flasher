@@ -150,7 +150,7 @@ class AgentManager extends EventEmitter {
       `-agentDir=${REFLASHER_CONFIG_PATH}`,
       `-appsDir=${appsDir}`,
       '-config',
-      `${flashItem.reswarm!.configPath}`,
+      `${flashItem.flock!.configPath}`,
       `-logFile=${logFilePath}`,
       '-update=false',
       '-prettyLogging'
@@ -251,6 +251,7 @@ class AgentManager extends EventEmitter {
   // agent name. The log and db are recreated on every start, so nothing is lost.
   private async removeLegacyFiles() {
     await Promise.all(
+      // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal -- LEGACY_FILES is a constant list
       LEGACY_FILES.map((name) => fs.rm(path.join(this.agentDir, name), { force: true }))
     ).catch(() => undefined)
   }

@@ -102,10 +102,11 @@ export default {
     'In order to test the device on your local computer, downloading the IronFlock device agent is required.',
   agent_update_available:
     'An update is available for the IronFlock device agent! Continue by downloading the update.',
-  docker_is_required:
-    '<strong>Docker is required</strong>, in order to test your Record Evolution Device.',
+  docker_is_required: '{required}, in order to test your IronFlock device.',
+  docker_is_required_strong: 'Docker is required',
   make_sure_docker_is_running:
-    'If you have already installed Docker, make sure the <strong>Docker daemon</strong> is running in the background.',
+    'If you have already installed Docker, make sure the {daemon} is running in the background.',
+  docker_daemon: 'Docker daemon',
   docker_please_follow_instructions:
     'Please follow the intructions {anchor} in order to install Docker.',
   improve_flash_performance: 'Improve flashing performance',

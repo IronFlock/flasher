@@ -31,7 +31,7 @@ const api = {
   unmount: (path: string) => ipcRenderer.invoke(RPC.Unmount, path) as Promise<void>,
   mount: (drive: Drive) => ipcRenderer.invoke(RPC.Mount, drive) as Promise<void>,
   chooseFile: () => ipcRenderer.invoke(RPC.ChooseFile) as Promise<Electron.OpenDialogReturnValue>,
-  // Scoped in the main process to .flock/.reswarm config files; returns utf8 text.
+  // Scoped in the main process to .flock config files; returns utf8 text.
   readFile: (path: string) => ipcRenderer.invoke(RPC.ReadFile, path) as Promise<string>,
   // Electron 32+ removed File.path; getPathForFile is the supported way to resolve
   // the absolute path of a drag-and-dropped file from the renderer.

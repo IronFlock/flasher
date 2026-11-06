@@ -11,6 +11,11 @@ name: security
 on:
   pull_request:
     branches: [main]
+  # Every merge: the Security tab shows main as released. (A scheduled run
+  # scans the dependencies only, so without this main's semgrep, gitleaks and
+  # trivy results would stay at the last manual run.)
+  push:
+    branches: [main]
   schedule:
     # Mondays 11:17 UTC: catch CVEs disclosed against unchanged code.
     - cron: "17 11 * * 1"
