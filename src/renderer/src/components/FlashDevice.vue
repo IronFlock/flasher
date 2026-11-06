@@ -59,9 +59,7 @@ const flashItem = flashItemById.value(props.id ?? 0)
         flashItem?.flash.state == 'flashing' ||
         flashItem?.flash.state == 'verifying' ||
         flashItem?.flash.state == 'decompressing' ||
-        flashItem?.flash.state == 'downloading' ||
-        flashItem?.flash.state == 'extracting-iso' ||
-        flashItem?.flash.state == 'recreating-iso'
+        flashItem?.flash.state == 'downloading'
       "
     >
       <v-progress-linear

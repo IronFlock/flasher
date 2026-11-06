@@ -1,156 +1,173 @@
-import { automountDriveLinux, waitForMount } from './drives'
 import { getNodeModulesResourcePath, killProcessDarwin } from '../utils'
 import { ChildProcess } from 'child_process'
-import { FlashItem, Progress } from '../../types'
-import { elevatedNodeChildProcess } from './permissions'
+import { FlashItem, ImageInfo, Progress } from '../../types'
+import { elevatedNodeChildProcess, elevatedSpawn, spawnAsync } from './permissions'
 import { FLASH_SCRIPT } from '../security/elevated-scripts'
-import { assertValidReswarmConfig } from '../security/validation'
+import { assertFlashRequest } from '../security/validation'
 import { verifyFileSha256 } from '../security/integrity'
-import { copyFile, rename, unlink, writeFile } from 'fs/promises'
+import { mkdtemp, open, readFile, rename, rm, stat, unlink, writeFile } from 'fs/promises'
 import ImageManager, { REFLASHER_CONFIG_PATH } from './boards'
+import { CatalogStore } from './catalogs'
+import {
+  CommandRunner,
+  INSTALLER_CONF_FILE,
+  configFileName,
+  installerConf,
+  mountConfigPartition
+} from '../utils/config-partition'
+import { cachedImageName } from '../../shared/images'
+import os from 'os'
 import path from 'path'
 import { Drive } from 'drivelist'
-import {
-  cleanupISOContents,
-  extractISO,
-  rebuildISOFromContents,
-  unmountISO,
-  writeFileISOContents
-} from './iso'
 
 const activeFlashProcesses = new Map<number, ChildProcess>()
 export const imageManager = new ImageManager()
 imageManager.createReflasherDirIfNotExists().catch(console.error)
+export const catalogStore = new CatalogStore({ cacheDir: REFLASHER_CONFIG_PATH })
 
-const copyConfigFile = async (drive: Drive, reswarmConfigPath: string) => {
-  // For some reason linux doesn't automount the drive, so we have to manually do it
-  if (process.platform === 'linux') {
-    await automountDriveLinux(drive)
-  }
-
-  const mountedDrive = await waitForMount(drive.description)
-
-  if (mountedDrive.mountpoints.length === 0) {
-    throw new Error('Mountpoint not found!')
-  }
-
-  const targetPath = mountedDrive.mountpoints[0].path
-  const fileBaseName = path.basename(reswarmConfigPath)
-
-  // Backwards compatibility for .flock files
-  // It will always create a second config file with the name .reswarm in case a .flock file is provided
-  try {
-    const fileBaseNameSplit = fileBaseName.split(".")
-    if (fileBaseNameSplit[1] === 'flock') {
-      const dotReswarmFileName = fileBaseNameSplit[0] + '.reswarm'
-      console.log("Creating copy of .flock file as .reswarm for backwards compatibility")
-      await copyFile(reswarmConfigPath, path.join(targetPath, dotReswarmFileName))  
+// spawnAsync rejects with { code, stderr, ... }; the partition code wants Errors.
+const asRunner =
+  (spawner: typeof spawnAsync): CommandRunner =>
+  async (command, args) => {
+    try {
+      return await spawner(command, args)
+    } catch (failure: any) {
+      const detail = String(failure?.stderr ?? failure?.error?.message ?? '').trim()
+      throw new Error(`${command} ${args[0] ?? ''} failed (${failure?.code ?? 'error'}) ${detail}`)
     }
-  } catch (error) {
-    console.error("Failed to copy a copy of .flock")
   }
+const run = asRunner(spawnAsync)
+const runElevated = asRunner(elevatedSpawn)
 
-  return copyFile(reswarmConfigPath, path.join(targetPath, fileBaseName))
+const writeFileDurably = async (target: string, data: Buffer) => {
+  const handle = await open(target, 'w')
+  try {
+    await handle.writeFile(data)
+    await handle.sync()
+  } finally {
+    await handle.close()
+  }
 }
 
-const getReswarmImage = async (
-  flashItem: FlashItem,
+// Writes the device file onto the flashed drive: the FAT partition labelled
+// FLOCKOS, else the first FAT partition, found by label and file system rather
+// than by order, and mounted for the purpose if the OS did not mount it (macOS
+// and Windows mount no EFI system partition by themselves). On an installer
+// stick, installer.conf names the image it installs (`payload`).
+const writeDeviceConfig = async (drive: Drive, configPath: string, payload?: string) => {
+  const files: [string, Buffer][] = [[configFileName(configPath), await readFile(configPath)]]
+  if (payload) files.push([INSTALLER_CONF_FILE, Buffer.from(installerConf(payload))])
+  const mounted = await mountConfigPartition(process.platform, drive.device, {
+    run,
+    runElevated,
+    makeTempDir: () => mkdtemp(path.join(os.tmpdir(), 'flockflasher-')),
+    removeDir: (dir) => rm(dir, { recursive: true, force: true }),
+    writeTempFile: async (content) => {
+      const file = path.join(await mkdtemp(path.join(os.tmpdir(), 'flockflasher-')), 'assign.txt')
+      await writeFile(file, content)
+      return file
+    },
+    // the temp file sits in a directory of its own
+    removeFile: (file) => rm(path.dirname(file), { recursive: true, force: true }),
+    uid: process.getuid?.(),
+    gid: process.getgid?.()
+  })
+  console.log(
+    `Writing the device file to ${mounted.partition.id} (${mounted.reason}) at ${mounted.mountpoint}`
+  )
+  try {
+    for (const [name, data] of files) {
+      const target = path.join(mounted.mountpoint, name)
+      try {
+        await writeFileDurably(target, data)
+      } catch (error: any) {
+        // A volume that only mounted through sudo (macOS) belongs to root.
+        if (process.platform === 'win32' || (error?.code !== 'EACCES' && error?.code !== 'EPERM')) {
+          throw error
+        }
+        // A temp copy, so that cp copies only data FlockFlasher made.
+        const dir = await mkdtemp(path.join(os.tmpdir(), 'flockflasher-'))
+        try {
+          await writeFile(path.join(dir, name), data)
+          await runElevated('cp', [path.join(dir, name), target])
+        } finally {
+          await rm(dir, { recursive: true, force: true })
+        }
+      }
+    }
+  } finally {
+    await mounted
+      .release()
+      .catch((error) => console.warn('Could not release the partition:', error))
+  }
+}
+
+// Downloads (or finds in the cache) a catalog image and returns the path of the
+// raw image to write. The image comes from the verified catalog
+// (catalogStore.resolve), never from the renderer or the .flock file, and the
+// download is checked against the catalog's size and SHA-256 (both of the
+// .img.gz) before it is decompressed and written.
+const getCatalogImage = async (
+  image: ImageInfo,
   updateState: (data: Partial<Progress>) => void
 ): Promise<string> => {
-  // Defense-in-depth: fields below (serial_number, name, image.file/download) flow
-  // into filesystem paths and the network. Validate before use even though the IPC
-  // boundary already checked, since this is the module that consumes them.
-  if (flashItem.reswarm?.config) {
-    assertValidReswarmConfig(flashItem.reswarm.config)
-  }
+  const cachedImagePath = imageManager.getImagePath(image)
+  if (await imageManager.checkIfImageFileExists(image)) return cachedImagePath
 
-  const image = flashItem.reswarm?.config?.board.latestImages[0]
-  let imagePath = flashItem.fullPath
+  const downloadTempPath = path.join(REFLASHER_CONFIG_PATH, 'temp-' + image.file)
+  const realImageTempPath = path.join(REFLASHER_CONFIG_PATH, 'temp-' + cachedImageName(image.file))
 
-  // Update .reswarm file (for WiFi information, etc.)
-  await writeFile(flashItem.fullPath, JSON.stringify(flashItem.reswarm!.config))
+  try {
+    await imageManager.downloadImageToFile(image, downloadTempPath, (progress) => {
+      updateState({ ...progress, type: 'downloading' })
+    })
 
-  if (!image) throw new Error('latest image is empty')
-
-  const imageFileExists = await imageManager.checkIfImageFileExists(image)
-  if (imageFileExists) {
-    imagePath = imageManager.getImagePath(image)
-  } else {
-    const zippedImageTempPath = path.join(REFLASHER_CONFIG_PATH, 'temp-' + image.file)
-    const realImageTempPath = path.join(REFLASHER_CONFIG_PATH, 'temp-' + image.file.slice(0, -3))
-
-    const realImagePath = path.join(REFLASHER_CONFIG_PATH, image.file.slice(0, -3))
-
-    try {
-      await imageManager.downloadImageToFile(image, zippedImageTempPath, (progress) => {
-        updateState({ ...progress, type: 'downloading' })
-      })
-
-      // Integrity: ImageInfo.sha256 is the digest of the COMPRESSED download (it
-      // matches ImageInfo.size, the .gz content-length), so verify the downloaded
-      // .gz — before decompressing, so a corrupt/tampered download never reaches
-      // the drive.
-      if (image.sha256) {
-        await verifyFileSha256(zippedImageTempPath, image.sha256)
-      }
-
-      await imageManager.unZipImage(image, zippedImageTempPath, (progress) => {
-        updateState({ ...progress, type: 'decompressing' })
-      })
-
-      await rename(realImageTempPath, realImagePath)
-
-      imagePath = imageManager.getImagePath(image)
-    } finally {
-      // Clean up both temp artifacts. The decompressed temp is normally consumed by
-      // the rename above, but if download/decompress/verify threw it can be left behind.
-      await Promise.allSettled([unlink(zippedImageTempPath), unlink(realImageTempPath)])
+    const { size } = await stat(downloadTempPath)
+    if (size !== image.size) {
+      throw new Error(`${image.file} is ${size} bytes; the catalog says ${image.size}`)
     }
-  }
+    await verifyFileSha256(downloadTempPath, image.sha256)
 
-  if (image?.osvariant !== 'image') {
-    const config = flashItem.reswarm!.config!
-    const deviceId = flashItem.reswarm!.config?.serial_number!
-
-    // cleanup old ISO contents
-    await cleanupISOContents(deviceId)
-
-    const devicePath = await extractISO(imagePath, deviceId, (percentage) => {
-      updateState({ percentage, type: 'extracting-iso' })
+    await imageManager.unZipImage(image, downloadTempPath, (progress) => {
+      updateState({ ...progress, type: 'decompressing' })
     })
-
-    await writeFileISOContents(`boot/${config.name}.flock`, JSON.stringify(config), deviceId)
-
-    // Backwards compatibility
-    await writeFileISOContents(`boot/${config.name}.reswarm`, JSON.stringify(config), deviceId)
-
-    const recreatedImagePath = await rebuildISOFromContents(imagePath, deviceId, (percentage) => {
-      updateState({ percentage, type: 'recreating-iso' })
-    })
-
-    unmountISO(deviceId, devicePath).catch(console.error)
-
-    return recreatedImagePath
+    await rename(realImageTempPath, cachedImagePath)
+    return cachedImagePath
+  } finally {
+    // Clean up both temp artifacts. They are normally consumed by the rename
+    // above, but if download/verify/decompress threw they can be left behind.
+    await Promise.allSettled([unlink(downloadTempPath), unlink(realImageTempPath)])
   }
-
-  return imagePath
 }
 
+// Flashes the FlockOS image a device file asks for, or the installer stick that
+// installs it. There is no other kind of flash: assertFlashRequest refuses
+// anything but a device file with catalog image keys, and what is written is
+// always a catalog image (catalogStore.plan), downloaded and checked here.
 export const flashDevice = async (
   flashItem: FlashItem,
   updateState: (data: Partial<Progress>) => void
 ) => {
-  if (!flashItem.drive || !flashItem.fullPath) throw new Error('drive not set')
+  if (!flashItem.drive) throw new Error('drive not set')
+  const { configPath, imageKey, installerKey } = assertFlashRequest(flashItem)
 
-  let imagePath = flashItem.fullPath
-  const image = flashItem.reswarm?.config?.board.latestImages[0]
+  let imagePath: string
+  let payload: string | undefined
+  try {
+    const plan = await catalogStore.plan(imageKey, installerKey)
+    payload = plan.payload?.image_id
 
-  if (flashItem.reswarm) {
-    imagePath = await getReswarmImage(flashItem, updateState)
+    // Update the device file (for WiFi information, etc.)
+    await writeFile(configPath, JSON.stringify(flashItem.reswarm!.config))
+
+    imagePath = await getCatalogImage(plan.write, updateState)
+  } catch (error) {
+    updateState({ type: 'failed' })
+    throw error
   }
 
   const stringifiedDrive = JSON.stringify(flashItem.drive)
-  const finalType = flashItem.reswarm ? 'configuring' : 'finished'
+  const finalType = 'configuring'
   // Requested from app.asar.unpacked: the flash subprocess runs under real Node
   // (below), which cannot require modules from inside the packed asar.
   const etcherSDKRequire = getNodeModulesResourcePath('etcher-sdk', { unpacked: true })
@@ -165,18 +182,11 @@ export const flashDevice = async (
     activeFlashProcesses.delete(flashItem.id)
 
     // Copy the file over when the flashing process has exited without an error code
-    if (code === 0 && signal === null && flashItem.reswarm) {
+    if (code === 0 && signal === null) {
       try {
-        if (image?.osvariant === 'image') {
-          try {
-            await copyConfigFile(flashItem.drive!, flashItem.fullPath)
-          } catch (error) {
-            if (process.platform !== 'win32') throw error
-
-            // For some reason, the first time this fails on windows, doing it again works.
-            await copyConfigFile(flashItem.drive!, flashItem.fullPath)
-          }
-        }
+        // Every FlockOS image is a raw image with a FLOCKOS partition
+        // (the catalog accepts osvariant "image" only).
+        await writeDeviceConfig(flashItem.drive!, configPath, payload)
 
         updateState({ type: 'finished' })
       } catch (error) {

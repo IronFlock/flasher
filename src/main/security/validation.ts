@@ -2,8 +2,8 @@
 // or is parsed from untrusted .flock/.reswarm config files. Electron-free so it
 // can be unit-tested. Even though the privileged sinks are now parameterized
 // (no shell/code interpolation), these guards are defense-in-depth: they keep a
-// malicious device path off a real disk and a crafted serial_number / name /
-// image filename from escaping the temp/cache directories via `..`.
+// malicious device path off a real disk and refuse a crafted device file at the
+// IPC boundary.
 
 // Matches any C0 control character (U+0000..U+001F).
 // eslint-disable-next-line no-control-regex
@@ -77,17 +77,17 @@ type MinimalConfig = {
 }
 
 /**
- * Validate the fields of a parsed .flock/.reswarm config that flow into
- * filesystem paths and download URLs. Throws on the first offending field.
+ * Validate the identifying fields of a parsed .flock/.reswarm config and the
+ * images of the board it carries. Throws on the first offending field. (The
+ * image to flash is resolved from the verified catalog, not from the config.)
  */
 export const assertValidReswarmConfig = (config: MinimalConfig): void => {
   if (!config || typeof config !== 'object') {
     throw new Error('Invalid config: not an object')
   }
 
-  // serial_number becomes the deviceId used to build temp/ISO directories.
+  // serial_number and name identify the device; neither may hold a path.
   assertSafePathSegment(config.serial_number, 'serial_number')
-  // name is written as boot/<name>.flock inside the ISO contents.
   assertSafePathSegment(config.name, 'device name')
 
   const images = config.board?.latestImages
@@ -99,4 +99,60 @@ export const assertValidReswarmConfig = (config: MinimalConfig): void => {
       if (image.download !== undefined) assertHttpsUrl(image.download, 'image download URL')
     }
   }
+}
+
+// <image_id>@<version> (imageKey in src/shared/images.ts): the only way a flash
+// request names its image.
+const IMAGE_KEY =
+  /^flockos-[a-z0-9]+(-[a-z0-9]+)*@(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$/
+
+export const isImageKey = (value: unknown): value is string =>
+  typeof value === 'string' && value.length <= 256 && IMAGE_KEY.test(value)
+
+const CONFIG_FILE = /[^\\/]\.(flock|reswarm)$/i
+
+type FlashRequest = {
+  fullPath?: unknown
+  reswarm?: {
+    configPath?: unknown
+    config?: MinimalConfig
+    imageKey?: unknown
+    installerKey?: unknown
+  }
+}
+
+/**
+ * Validate a flash request from the renderer: a device file (.flock/.reswarm),
+ * the key of a FlockOS catalog image (the variant), and optionally the key of
+ * the installer stick to write instead, which installs that variant. A request
+ * cannot name a local image file, a path or a URL to write: the main process
+ * resolves the keys against the verified catalog (CatalogStore.plan, which
+ * also checks that the installer carries the variant), downloads the image and
+ * checks it. Throws otherwise.
+ */
+export const assertFlashRequest = (
+  request: unknown
+): { configPath: string; imageKey: string; installerKey?: string } => {
+  const item = (request && typeof request === 'object' ? request : {}) as FlashRequest
+  const { fullPath, reswarm } = item
+  if (
+    typeof fullPath !== 'string' ||
+    CONTROL_CHARS.test(fullPath) ||
+    !CONFIG_FILE.test(fullPath) ||
+    !reswarm ||
+    typeof reswarm !== 'object' ||
+    !reswarm.config ||
+    (reswarm.configPath !== undefined && reswarm.configPath !== fullPath)
+  ) {
+    throw new Error('Only a device file (.flock, .reswarm) can be flashed, with a FlockOS image')
+  }
+  if (!isImageKey(reswarm.imageKey)) {
+    throw new Error('No FlockOS image chosen: choose the hardware and a FlockOS variant')
+  }
+  const installerKey = reswarm.installerKey
+  if (installerKey !== undefined && !isImageKey(installerKey)) {
+    throw new Error('Invalid installer stick choice')
+  }
+  assertValidReswarmConfig(reswarm.config)
+  return { configPath: fullPath, imageKey: reswarm.imageKey, installerKey }
 }

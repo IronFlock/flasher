@@ -3,11 +3,21 @@ import { FlashItem, FlashState, Progress, ReswarmConfig, SupportedBoard } from '
 import { useDrivesStore } from './drives'
 import { useBoardStore } from './boards'
 import { deepToRaw } from '@renderer/utils'
-import path from 'path-browserify'
 import { useSnackStore } from './snack'
+import {
+  defaultImageKey,
+  installerKeyFor,
+  isConfigFileName,
+  matchBoard,
+  rebindChoice
+} from '../../../shared/images'
 
-const imageTypes = ['flock', 'reswarm', 'iso', 'img'] as const
-type ImageType = (typeof imageTypes)[number]
+// An Error from ipcRenderer.invoke reads "Error invoking remote method 'x': Error: <message>".
+const remoteErrorMessage = (error: unknown): string =>
+  String((error as Error)?.message ?? error).replace(
+    /^Error invoking remote method '[^']*': (Error: )?/,
+    ''
+  )
 
 type FlashStoreState = {
   items: FlashItem[]
@@ -35,9 +45,19 @@ export const useFlashStore = () => {
       }
     },
     actions: {
+      // Adds a device file (.flock, .reswarm). FlockFlasher flashes the FlockOS
+      // image chosen for it from the signed catalog; there are no local images.
       async addItem(fullPath: string) {
         const driveStore = useDrivesStore()
         const boardStore = useBoardStore()
+
+        if (!isConfigFileName(fullPath)) {
+          const snackstore = useSnackStore()
+          snackstore.setText('errors.only_device_files')
+          snackstore.setColor('error')
+          snackstore.setVisible(true)
+          return
+        }
 
         const splitPath = fullPath.split('/')
         const fileName = splitPath.at(-1) as string
@@ -62,25 +82,72 @@ export const useFlashStore = () => {
           drive: defaultDrive
         }
 
-        if (fileType === 'flock' || fileType === 'reswarm') {
-          const configFileString = await window.api.readFile(fullPath)
+        const configFileString = await window.api.readFile(fullPath)
 
-          const config = JSON.parse(configFileString) as ReswarmConfig
-          const board = boardStore.boards.find(
-            (b) => b.model === config?.board?.model
-          ) as SupportedBoard
+        const config = JSON.parse(configFileString) as ReswarmConfig
 
-          // It can happen that the boards are not intialized (e.g. when opening FlockFlasher with .flock file)
-          // In that case we just fallback to the actual config
-          config.board = board ?? config.board
+        // Shows the boards, so the catalog is refreshed (at most every 5 minutes);
+        // a .flock opened with FlockFlasher arrives before the first load ends.
+        await boardStore.refresh()
+        // The board the file asks for, or the one board of its architecture;
+        // else none, and the user chooses. Only catalog boards are flashed.
+        config.board = matchBoard(boardStore.boards, config)
 
-          flashItem.reswarm = {
-            configPath: fullPath,
-            config
-          }
+        flashItem.reswarm = {
+          configPath: fullPath,
+          config,
+          imageKey: defaultImageKey(config.board)
         }
 
         this.items.push(flashItem)
+      },
+      // The catalog changed: idle devices keep their board and image on the new
+      // one; a device without a board gets the one its file asks for.
+      rebindBoards(boards: SupportedBoard[]) {
+        for (const item of this.items) {
+          const config = item.reswarm?.config
+          if (!item.reswarm || !config || item.flash.state !== 'idle') continue
+          const choice = config.board
+            ? rebindChoice(
+                boards,
+                config.board,
+                item.reswarm.imageKey,
+                item.reswarm.installerKey !== undefined
+              )
+            : { board: matchBoard(boards, config), imageKey: undefined, installerKey: undefined }
+          config.board = choice.board
+          item.reswarm.imageKey = choice.imageKey ?? defaultImageKey(choice.board)
+          item.reswarm.installerKey = choice.installerKey
+        }
+      },
+      // Chooses the hardware for a device file. Another hardware resets the
+      // variant to its default (base, std kernel) and the installation to a
+      // direct write; the same one keeps both.
+      selectBoard(flashItem: FlashItem, board: SupportedBoard | undefined) {
+        if (!flashItem.reswarm?.config) return
+        const same = board && flashItem.reswarm.config.board?.model === board.model
+        flashItem.reswarm.config.board = board
+        if (!same) {
+          flashItem.reswarm.imageKey = defaultImageKey(board)
+          flashItem.reswarm.installerKey = undefined
+        }
+      },
+      // Chooses the variant; the installer stick stays chosen only if it
+      // carries the new variant, else the image is written directly.
+      selectVariant(flashItem: FlashItem, key: string | undefined) {
+        if (!flashItem.reswarm?.config) return
+        flashItem.reswarm.imageKey = key
+        if (flashItem.reswarm.installerKey !== undefined) {
+          flashItem.reswarm.installerKey = installerKeyFor(flashItem.reswarm.config.board, key)
+        }
+      },
+      // How to install: write the variant's image to the drive (false), or the
+      // board's installer stick that carries it (true).
+      selectInstallMethod(flashItem: FlashItem, useInstaller: boolean) {
+        if (!flashItem.reswarm?.config) return
+        flashItem.reswarm.installerKey = useInstaller
+          ? installerKeyFor(flashItem.reswarm.config.board, flashItem.reswarm.imageKey)
+          : undefined
       },
       async flashDevice(flashItem: FlashItem) {
         const snackstore = useSnackStore()
@@ -92,9 +159,29 @@ export const useFlashStore = () => {
           return
         }
 
+        if (
+          flashItem.reswarm &&
+          (!flashItem.reswarm.config?.board || !flashItem.reswarm.imageKey)
+        ) {
+          snackstore.setText('errors.no_image_selected')
+          snackstore.setColor('error')
+          snackstore.setVisible(true)
+          return
+        }
+
         await window.sudoDialog.openDialog()
 
-        return window.api.flashDevice(deepToRaw(flashItem))
+        try {
+          return await window.api.flashDevice(deepToRaw(flashItem))
+        } catch (error) {
+          // e.g. an image that is not in the verified catalog, or a failed download
+          console.error('Flashing failed:', error)
+          const item = this.items.find((i) => i.id === flashItem.id)
+          if (item) item.flash.state = 'failed'
+          snackstore.setRawText(remoteErrorMessage(error))
+          snackstore.setColor('error')
+          snackstore.setVisible(true)
+        }
       },
       cancelFlashing(flashItem: FlashItem) {
         return window.api.cancelFlashing(flashItem.id)
@@ -116,6 +203,8 @@ export const useFlashStore = () => {
         this.items.splice(flashItemIndex, 1)
       },
       initialize() {
+        this.initialized = true
+
         document.body.addEventListener('dragover', (evt) => {
           evt.preventDefault()
         })
@@ -130,9 +219,6 @@ export const useFlashStore = () => {
 
           const filePath = window.api.getPathForFile(file)
           if (!filePath) return
-
-          const { ext } = path.parse(filePath)
-          if (!imageTypes.includes(`${ext.slice(1) as ImageType}`)) return
 
           this.addItem(filePath)
         })

@@ -15,7 +15,7 @@ export default {
   add_device: 'Add device',
   no_device_name: 'No device name',
   no_devices_in_list: 'No devices in list',
-  devices_list_subtitle: 'Add a device by selecting a .flock or disk image file',
+  devices_list_subtitle: 'Add a device by selecting its .flock file',
   swarm: 'Fleet',
   no_swarm: 'No Fleet',
   no_swarm_owner: 'No fleet owner',
@@ -28,9 +28,27 @@ export default {
   refresh_drive_list: 'Refresh list of external drives',
   include_drive_for_flashing: 'Include drive for flashing',
   use_all_drives: 'Use all drives',
-  board: 'Board',
-  choose_board: 'Choose board',
-  choose_board_and_os: 'Choose hardware board and OS image',
+  board: 'Hardware',
+  choose_board: 'Choose hardware',
+  choose_hardware: 'Hardware',
+  choose_variant: 'FlockOS variant',
+  choose_hardware_first: 'Choose the hardware first',
+  variants: {
+    base: 'Standard',
+    nvidia: 'NVIDIA GPU',
+    rt: 'real-time kernel'
+  },
+  installation: {
+    method: 'How to install',
+    direct: "Write the image to this drive (the drive becomes the device's boot disk)",
+    installer: "Installer stick (installs onto the device's internal disk)"
+  },
+  catalog: {
+    refused: 'The FlockOS catalog was refused, so no FlockOS images are offered',
+    offline: 'Offline: FlockOS images as listed on {issuedAt}',
+    kept: 'The FlockOS catalog could not be refreshed; the images are those listed on {issuedAt}',
+    retry: 'Retry'
+  },
   specify_wlan_or_lan: 'Specify WiFi SSID or choose a local network',
   cancel_writing: 'Cancel writing',
   skip_verification: 'Skip verification',
@@ -44,7 +62,6 @@ export default {
   flashing_canceled: 'Flashing canceled',
   verification_canceled: 'Ready to use (data not verified)',
   hardware: 'Hardware',
-  image: 'Image',
   choose_image: 'Choose image',
   unavailable: 'Unavailable',
   name_unknown: 'Name unknown',
@@ -110,7 +127,10 @@ export default {
   },
   errors: {
     invalid_sudo_password: 'The password you have entered is incorrect',
-    no_drive_selected: 'Please select a drive to flash your image'
+    no_drive_selected: 'Please select a drive to flash your image',
+    no_image_selected: 'Please choose the hardware and a FlockOS variant',
+    only_device_files:
+      'Add a device by its .flock file: FlockFlasher writes FlockOS images from the signed catalog only'
   },
   flashing_state: {
     inactive: 'Inactive',
@@ -119,8 +139,6 @@ export default {
     downloading: 'Downloading image...',
     downloadwait: 'Waiting for download...',
     decompressing: 'Extracting image...',
-    'extracting-iso': 'Extracting Installer...',
-    'recreating-iso': 'Configuring Installer...',
     verifying: 'Validating...',
     mount: 'Mounting drive...',
     unmount: 'Unmounting drive...',

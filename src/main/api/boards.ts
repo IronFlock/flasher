@@ -1,20 +1,20 @@
 import { homedir } from 'node:os'
 import { createGunzip } from 'node:zlib'
-import { access, mkdir, readFile } from 'node:fs/promises'
+import { access, mkdir } from 'node:fs/promises'
 import { createWriteStream, createReadStream } from 'node:fs'
-import https from 'node:https'
 import path from 'node:path'
-import { ImageInfo, Progress, SupportedBoard } from '../../types'
+import { ImageInfo, Progress } from '../../types'
 import { calculateETA, calculateSpeed, downloadFile } from '../utils'
+import { cachedImageName } from '../../shared/images'
 
+// The boards themselves come from ./catalogs (the signed FlockOS catalog);
+// this caches and unpacks their images.
 const CONFIG_PATH = '.Reflasher'
-const AVAILABLE_IMAGES = 'supportedBoardsImages.json'
-const BUCKET_URL = 'https://instance-registry.ironflock.com/dl/reswarmos/'
 export const REFLASHER_CONFIG_PATH = path.join(homedir(), CONFIG_PATH)
 
 export default class ImageManager {
   getImagePath(image: ImageInfo) {
-    return path.join(REFLASHER_CONFIG_PATH, image.file.slice(0, -3))
+    return path.join(REFLASHER_CONFIG_PATH, cachedImageName(image.file))
   }
 
   async createReflasherDirIfNotExists() {
@@ -31,46 +31,6 @@ export default class ImageManager {
     }
   }
 
-  async readSupportedBoards(): Promise<SupportedBoard[]> {
-    const fileContent = await readFile(path.join(REFLASHER_CONFIG_PATH, AVAILABLE_IMAGES))
-    const parsed = JSON.parse(fileContent.toString())
-    return parsed.boards
-  }
-
-  downloadSupportedBoards(): Promise<SupportedBoard[]> {
-    let file = ''
-    return new Promise((resolve, reject) => {
-      https
-        .get(BUCKET_URL + AVAILABLE_IMAGES, (res) => {
-          const status = res.statusCode ?? 0
-          if (status < 200 || status >= 300) {
-            res.resume()
-            return reject(new Error(`Failed to fetch supported boards: HTTP ${status}`))
-          }
-          res.on('data', (d) => {
-            file = file + d.toString()
-          })
-          res.on('error', (err) => reject(err))
-          res.on('end', () => {
-            // Guard JSON.parse so a malformed/HTML error body rejects instead of
-            // throwing synchronously inside the event handler.
-            try {
-              const parsed = JSON.parse(file)
-              if (!parsed || !Array.isArray(parsed.boards)) {
-                return reject(new Error('Malformed supported-boards response'))
-              }
-              resolve(parsed.boards)
-            } catch (err) {
-              reject(err)
-            }
-          })
-        })
-        .on('error', (err) => {
-          reject(err)
-        })
-    })
-  }
-
   async checkIfImageZipExists(image: ImageInfo): Promise<boolean> {
     try {
       await access(path.join(REFLASHER_CONFIG_PATH, image.file))
@@ -82,7 +42,7 @@ export default class ImageManager {
 
   async checkIfImageFileExists(image: ImageInfo): Promise<boolean> {
     try {
-      await access(path.join(REFLASHER_CONFIG_PATH, image.file.slice(0, -3)))
+      await access(this.getImagePath(image))
       return true
     } catch {
       return false

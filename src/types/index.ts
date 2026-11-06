@@ -1,9 +1,6 @@
 import type { Drive } from 'drivelist'
 import type { WriteStep } from 'etcher-sdk/build/multi-write'
 
-export const imageTypes = ['flock', 'reswarm', 'iso', 'img'] as const
-export type ImageType = (typeof imageTypes)[number]
-
 export enum RPC {
   ListDrives = 'list-drives',
   ListPartitions = 'list-partitions',
@@ -28,6 +25,12 @@ export enum RPC {
   InstallUpdate = 'install-update'
 }
 
+// Boards and images come from the signed FlockOS catalog
+// (dl/flockos/manifest.json, see the README "Board catalogs"); its boards view
+// keeps the shape of FlockFlasher's earlier catalog.
+export type ImageVariant = 'base' | 'nvidia' | 'installer'
+export type ImageKernel = 'std' | 'rt'
+
 export type ImageInfo = {
   buildtime: string
   download: string
@@ -38,6 +41,12 @@ export type ImageInfo = {
   size: number
   update: string
   version: string
+  // manifest schema 1: the variant choice
+  image_id: string
+  variant: ImageVariant
+  kernel: ImageKernel
+  // installer images only: the image ids the stick carries
+  payloads?: string[]
 }
 
 export type SupportedBoard = {
@@ -52,19 +61,27 @@ export type SupportedBoard = {
   modelname: string
 }
 
+// What RPC.GetSupportedBoards returns. A catalog that does not verify yields
+// no boards and an error, never unverified boards.
+export type FlockOSCatalogStatus =
+  | { ok: true; production: string; issuedAt: string; fromCache: boolean }
+  // kept: the last verified catalog, still offered after a refresh failed
+  | {
+      ok: false
+      code: string
+      error: string
+      kept?: { production: string; issuedAt: string }
+    }
+
+export type BoardCatalogs = {
+  boards: SupportedBoard[]
+  flockos: FlockOSCatalogStatus
+}
+
 export type ReswarmConfig = {
   name: string
-  board: {
-    cpu: string
-    docs: string
-    board: string
-    latestImages: ImageInfo[]
-    model: string
-    boardname: string
-    modelname: string
-    reflasher: boolean
-    architecture: string
-  }
+  // Today's .flock files carry no board; FlockFlasher sets the one chosen.
+  board?: SupportedBoard
   secret: string
   status: string
   password: string
@@ -96,8 +113,6 @@ export type FlashState =
   | 'downloading'
   | 'configuring'
   | 'starting'
-  | 'extracting-iso'
-  | 'recreating-iso'
 
 export type Progress = {
   canceled: boolean
@@ -126,6 +141,11 @@ export type FlashItem = {
     configPath?: string
     config?: ReswarmConfig
     board?: SupportedBoard
+    // imageKey (src/shared/images.ts) of the variant chosen from the board.
+    imageKey?: string
+    // Set to install through the board's installer stick (its imageKey)
+    // instead of writing the variant's image to the drive.
+    installerKey?: string
     wifiPassword?: string
     wifiSSID?: string
     showPassword?: boolean

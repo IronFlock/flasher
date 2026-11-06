@@ -1,11 +1,19 @@
 <script setup lang="ts">
 import Agent from './Agent.vue'
-import type { SupportedBoard } from 'src/types'
+import type { ImageInfo, SupportedBoard } from 'src/types'
 import { storeToRefs } from 'pinia'
 import { useDrivesStore } from '@renderer/store/drives'
 import { Drive } from 'drivelist'
-import { watch } from 'vue'
+import { computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { cutInfoString } from '../utils'
+import {
+  defaultImage,
+  hardwareTitle,
+  imageKey,
+  installerFor,
+  variantImages
+} from '../../../shared/images'
 import { useBoardStore } from '@renderer/store/boards'
 import { useWifiStore } from '@renderer/store/wifi'
 import { useFlashStore } from '@renderer/store/flash'
@@ -22,7 +30,29 @@ const agentStore = useAgentStore()
 
 const { downloadState } = storeToRefs(agentStore)
 const { drives } = storeToRefs(drivesStore)
-const { boards } = storeToRefs(boardStore)
+const { boards, flockos } = storeToRefs(boardStore)
+const { t } = useI18n()
+
+// Menu 1: the hardware only.
+const boardTitle = (board: SupportedBoard) => hardwareTitle(board, boards.value)
+
+// Menu 2: the variants of the chosen hardware, the FlockOS version once below.
+const variantTitle = (image: ImageInfo) => {
+  const variant = t(`variants.${image.variant}`)
+  return image.kernel === 'rt' ? `${variant}, ${t('variants.rt')}` : variant
+}
+
+const variantHint = (board: SupportedBoard | undefined) => {
+  if (!board) return t('choose_hardware_first')
+  const version = defaultImage(board.latestImages)?.version
+  return version ? `FlockOS ${version}` : ''
+}
+
+// Menu 3, only when the board's installer stick carries the chosen variant.
+const installMethods = computed(() => [
+  { value: 'direct', title: t('installation.direct') },
+  { value: 'installer', title: t('installation.installer') }
+])
 const { accessPoints } = storeToRefs(wifiStore)
 const { flashItems } = storeToRefs(flashStore)
 
@@ -35,6 +65,9 @@ async function addByFilePicker() {
 
   return flashStore.addItem(fullPath)
 }
+
+// A refreshed catalog: keep each device's board and image choice on it.
+watch(boards, (list) => flashStore.rebindBoards(list))
 
 // Update drive of flashitem if drive list changes
 watch(drives, (updatedDl) => {
@@ -79,6 +112,38 @@ watch(drives, (updatedDl) => {
 
     <v-divider style="margin-top: 20px"></v-divider>
 
+    <v-alert
+      v-if="flockos && !flockos.ok"
+      class="mt-2"
+      type="error"
+      density="compact"
+      :title="
+        flockos.kept
+          ? $t('catalog.kept', { issuedAt: flockos.kept.issuedAt })
+          : $t('catalog.refused')
+      "
+      :text="flockos.error"
+    >
+      <template #append>
+        <v-btn size="small" variant="text" @click="boardStore.refresh(true)">
+          {{ $t('catalog.retry') }}
+        </v-btn>
+      </template>
+    </v-alert>
+    <v-alert
+      v-else-if="flockos?.ok && flockos.fromCache"
+      class="mt-2"
+      type="info"
+      density="compact"
+      :text="$t('catalog.offline', { issuedAt: flockos.issuedAt })"
+    >
+      <template #append>
+        <v-btn size="small" variant="text" @click="boardStore.refresh(true)">
+          {{ $t('catalog.retry') }}
+        </v-btn>
+      </template>
+    </v-alert>
+
     <v-expansion-panels>
       <v-expansion-panel v-for="flashItem in flashItems">
         <!-- -------------------- Header of Device -------------------- -->
@@ -117,18 +182,6 @@ watch(drives, (updatedDl) => {
                   {{
                     cutInfoString(flashItem.reswarm?.config?.swarm_name ?? '', 25, $t('no_swarm'))
                   }}
-                </div>
-              </div>
-
-              <div v-if="!flashItem.reswarm" class="infoBox infoBoxB">
-                <div class="textHead">
-                  {{ $t('image') }}
-                </div>
-                <div class="textDesc">
-                  {{ cutInfoString(flashItem.fileDirectory, 50) }}
-                </div>
-                <div class="textMain">
-                  {{ cutInfoString(flashItem.fileName, 50) }}
                 </div>
               </div>
 
@@ -222,8 +275,6 @@ watch(drives, (updatedDl) => {
                     flashItem.flash.state === 'configuring' ||
                     flashItem.flash.state === 'verifying' ||
                     flashItem.flash.state === 'starting' ||
-                    flashItem.flash.state === 'extracting-iso' ||
-                    flashItem.flash.state === 'recreating-iso' ||
                     flashItem.flash.state === 'decompressing' ||
                     !flashItem.drive
                   "
@@ -282,11 +333,43 @@ watch(drives, (updatedDl) => {
 
             <v-select
               v-if="flashItem.reswarm && flashItem.flash.state === 'idle'"
-              v-model="flashItem.reswarm.config!.board"
-              :label="$t('choose_board_and_os')"
-              :items="boards.slice().sort((a, b) => a.modelname.localeCompare(b.modelname))"
-              :item-title="(el: SupportedBoard) => el.modelname + ' (' + el.architecture + ') ' + el.latestImages?.[0].version"
+              :model-value="flashItem.reswarm.config!.board"
+              @update:model-value="(board) => flashStore.selectBoard(flashItem, board)"
+              @update:menu="(open: boolean) => open && boardStore.refresh()"
+              :label="$t('choose_hardware')"
+              :items="boards"
+              :item-title="boardTitle"
               :item-value="(el) => el"
+              variant="outlined"
+            ></v-select>
+
+            <v-select
+              v-if="flashItem.reswarm?.config && flashItem.flash.state === 'idle'"
+              :model-value="flashItem.reswarm.imageKey"
+              @update:model-value="(key) => flashStore.selectVariant(flashItem, key)"
+              :label="$t('choose_variant')"
+              :disabled="!flashItem.reswarm.config.board"
+              :items="variantImages(flashItem.reswarm.config.board)"
+              :item-title="variantTitle"
+              :item-value="imageKey"
+              :hint="variantHint(flashItem.reswarm.config.board)"
+              persistent-hint
+              variant="outlined"
+              class="mb-4"
+            ></v-select>
+
+            <v-select
+              v-if="
+                flashItem.reswarm?.config &&
+                flashItem.flash.state === 'idle' &&
+                installerFor(flashItem.reswarm.config.board, flashItem.reswarm.imageKey)
+              "
+              :model-value="flashItem.reswarm.installerKey !== undefined ? 'installer' : 'direct'"
+              @update:model-value="
+                (method) => flashStore.selectInstallMethod(flashItem, method === 'installer')
+              "
+              :label="$t('installation.method')"
+              :items="installMethods"
               variant="outlined"
             ></v-select>
 
@@ -462,7 +545,7 @@ watch(drives, (updatedDl) => {
 #removeButton {
   position: absolute;
   top: 4px;
-  right: -4px;
+  right: 0;
 }
 
 #transparentButton {
@@ -518,12 +601,6 @@ watch(drives, (updatedDl) => {
 .infoBoxA {
   width: 190px;
   max-width: 190px;
-  display: inline-block;
-}
-
-.infoBoxB {
-  width: 380px;
-  max-width: 380px;
   display: inline-block;
 }
 
