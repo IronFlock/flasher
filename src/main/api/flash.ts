@@ -77,6 +77,7 @@ const writeDeviceConfig = async (drive: Drive, configPath: string, payload?: str
   )
   try {
     for (const [name, data] of files) {
+      // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal -- name is installer.conf or configFileName(), which has no separators and no leading/trailing dots
       const target = path.join(mounted.mountpoint, name)
       try {
         await writeFileDurably(target, data)
@@ -114,7 +115,11 @@ const getCatalogImage = async (
   const cachedImagePath = imageManager.getImagePath(image)
   if (await imageManager.checkIfImageFileExists(image)) return cachedImagePath
 
+  // image.file comes from the signed catalog and is a single path segment
+  // (isSafePathSegment in security/catalog.ts).
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
   const downloadTempPath = path.join(REFLASHER_CONFIG_PATH, 'temp-' + image.file)
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
   const realImageTempPath = path.join(REFLASHER_CONFIG_PATH, 'temp-' + cachedImageName(image.file))
 
   try {

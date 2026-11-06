@@ -38,6 +38,8 @@ export const getNodeModulesResourcePath = (moduleName: string, opts?: { unpacked
   // The elevated subprocess runs a temp script whose module loader does NOT walk up
   // into the project's node_modules, so we must hand it an absolute path. In dev
   // that is the project's node_modules (app.getAppPath() is the project root).
+  // moduleName is a constant of the callers ('etcher-sdk', 'mountutils').
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
   if (is.dev) return path.join(app.getAppPath(), 'node_modules', moduleName)
 
   const resourcePath = process.env.APPIMAGE
@@ -49,6 +51,7 @@ export const getNodeModulesResourcePath = (moduleName: string, opts?: { unpacked
   // is asarUnpack'd for exactly this reason). Electron-node consumers (the unmount
   // script) can read the packed asar directly.
   const nodeModules = opts?.unpacked ? 'app.asar.unpacked/node_modules' : 'app.asar/node_modules'
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal -- moduleName is a constant (above)
   return path.join(resourcePath, nodeModules, moduleName)
 }
 

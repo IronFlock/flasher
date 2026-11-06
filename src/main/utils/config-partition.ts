@@ -135,11 +135,11 @@ export const parseLsblk = (stdout: string): PartitionInfo[] => {
 
 // The partition identifiers (disk4s1, ...) of `diskutil list /dev/disk4`.
 export const parseDiskutilList = (stdout: string, disk: string): string[] => {
-  const pattern = new RegExp(`^${disk}s\\d+$`)
+  const prefix = `${disk}s`
   return stdout
     .split('\n')
     .map((line) => line.trim().split(/\s+/).pop() ?? '')
-    .filter((id) => pattern.test(id))
+    .filter((id) => id.startsWith(prefix) && /^\d+$/.test(id.slice(prefix.length)))
 }
 
 // `diskutil info` prints "   Key:   value" lines.
@@ -306,7 +306,7 @@ const mountLinux = async (device: string, deps: MountDeps): Promise<MountedConfi
       }
     }
   } catch (error) {
-    console.warn(`udisksctl could not mount ${block}; mounting it directly:`, error)
+    console.warn('udisksctl could not mount %s; mounting it directly:', block, error)
   }
 
   if (!deps.makeTempDir) throw new Error(`Cannot mount ${block}`)
