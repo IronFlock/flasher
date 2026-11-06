@@ -22,7 +22,7 @@ watch(logs, () => {
           <v-icon size="20">mdi-console</v-icon>
         </span>
         <h2 class="dlg__title">
-          {{ $t('agent.currently_running', { name: activeItem?.reswarm?.config?.name }) }}
+          {{ $t('agent.currently_running', { name: activeItem?.flock?.config?.name }) }}
         </h2>
       </div>
 

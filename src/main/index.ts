@@ -190,7 +190,7 @@ async function main() {
   await app.whenReady()
 
   // Set app user model id for windows
-  electronApp.setAppUserModelId('com.recordevolution')
+  electronApp.setAppUserModelId('com.ironflock.flockflasher') // = electron-builder.yml appId
 
   if (is.dev) {
     // Installing Vue devtools downloads a .crx from the Chrome Web Store, which can

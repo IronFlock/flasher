@@ -69,7 +69,7 @@ describe('matchBoard', () => {
     expect(matchBoard(boards, { board: { model: 'raspberrypi4' } })?.model).toBe('raspberrypi4')
   })
 
-  it('offers nothing for a model the catalog does not list (a ReswarmOS board)', () => {
+  it('offers nothing for a model the catalog does not list', () => {
     expect(matchBoard(boards, { board: { model: 'raspberrypi3' } })).toBeUndefined()
     expect(matchBoard(boards, { architecture: 'armv7', board: { model: 'efi' } })).toBeUndefined()
   })
@@ -84,10 +84,11 @@ describe('matchBoard', () => {
 
 describe('file names', () => {
   it('takes device files only, no disk images', () => {
-    for (const name of ['a.flock', '/home/u/a.reswarm', 'C:\\x\\A.FLOCK']) {
+    for (const name of ['a.flock', '/home/u/b.flock', 'C:\\x\\A.FLOCK']) {
       expect(isConfigFileName(name)).toBe(true)
     }
     for (const name of [
+      'a.reswarm',
       'a.img',
       'a.img.gz',
       'a.img.xz',

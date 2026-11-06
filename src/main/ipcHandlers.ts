@@ -13,12 +13,12 @@ import { autoUpdater } from 'electron-updater'
 import {
   assertFlashRequest,
   assertValidDevicePath,
-  assertValidReswarmConfig
+  assertValidFlockConfig
 } from './security/validation'
 import { FILE_DIALOG_EXTENSIONS } from '../shared/images'
 
 // Config files the renderer is allowed to read back through RPC.ReadFile.
-const READABLE_CONFIG_EXTENSIONS = ['.flock', '.reswarm']
+const READABLE_CONFIG_EXTENSIONS = ['.flock']
 // Cap on a config file read so a malicious path can't stream a huge file into memory.
 const MAX_CONFIG_READ_BYTES = 5 * 1024 * 1024
 
@@ -92,7 +92,7 @@ function handleChooseFile(mainWindow: BrowserWindow) {
     defaultPath: process.env.HOME + '/Downloads',
     filters: [
       {
-        name: 'Device files (.flock, .reswarm)',
+        name: 'Device files (.flock)',
         extensions: FILE_DIALOG_EXTENSIONS
       }
     ],
@@ -103,7 +103,7 @@ function handleChooseFile(mainWindow: BrowserWindow) {
 }
 
 // Scoped config reader. This used to be an arbitrary-file-read primitive exposed
-// to the renderer; it now only reads .flock/.reswarm config files, as utf8, with a
+// to the renderer; it now only reads .flock config files, as utf8, with a
 // size cap — the sole legitimate use (parsing the config being flashed).
 async function handleReadFile(_, filePath: string) {
   if (typeof filePath !== 'string' || filePath.length === 0) {
@@ -162,15 +162,15 @@ function handleAgentEvents(mainWindow: BrowserWindow) {
 }
 
 async function handleTestDevice(flashItem: FlashItem) {
-  const configPath = flashItem?.reswarm?.configPath
+  const configPath = flashItem?.flock?.configPath
   if (
     typeof configPath !== 'string' ||
     !READABLE_CONFIG_EXTENSIONS.includes(path.extname(configPath).toLowerCase())
   ) {
     throw new Error('Invalid or missing device config path')
   }
-  if (flashItem.reswarm?.config) {
-    assertValidReswarmConfig(flashItem.reswarm.config)
+  if (flashItem.flock?.config) {
+    assertValidFlockConfig(flashItem.flock.config)
   }
   return agentManager.startAgent(flashItem)
 }

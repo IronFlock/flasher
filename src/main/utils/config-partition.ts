@@ -74,14 +74,14 @@ export const chooseConfigPartition = (partitions: PartitionInfo[]): PartitionCho
   return undefined
 }
 
-// The name the device file gets on the partition: <name>.flock, also for a
-// .reswarm file (FlockOS reads *.flock only). Nothing else is written; enroll
+// The name the device file gets on the partition: <name>.flock (FlockOS reads
+// *.flock only), made valid on FAT. Nothing else is written; enroll
 // removes the .flock after use, so no copy with the device's credentials stays.
 export const configFileName = (sourcePath: string): string => {
   const base = sourcePath.split(/[\\/]/).pop() ?? ''
   const stem =
     base
-      .replace(/\.(flock|reswarm)$/i, '')
+      .replace(/\.flock$/i, '')
       // eslint-disable-next-line no-control-regex
       .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_')
       .replace(/[. ]+$/, '') || 'device'

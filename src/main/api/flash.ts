@@ -158,7 +158,7 @@ export const flashDevice = async (
     payload = plan.payload?.image_id
 
     // Update the device file (for WiFi information, etc.)
-    await writeFile(configPath, JSON.stringify(flashItem.reswarm!.config))
+    await writeFile(configPath, JSON.stringify(flashItem.flock!.config))
 
     imagePath = await getCatalogImage(plan.write, updateState)
   } catch (error) {

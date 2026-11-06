@@ -57,7 +57,7 @@ describe('chooseConfigPartition', () => {
     const choice = chooseConfigPartition([
       part(2, { fsType: 'ext4' }),
       part(3, { fsType: 'msdos', label: 'DATA' }),
-      part(1, { fsType: 'vfat', label: 'RESWARMOS' })
+      part(1, { fsType: 'vfat', label: 'BOOT' })
     ])
     expect(choice?.partition.index).toBe(1)
     expect(choice?.reason).toBe('first-fat')
@@ -96,9 +96,9 @@ describe('chooseConfigPartition', () => {
 })
 
 describe('configFileName', () => {
-  it('writes <name>.flock, also for a .reswarm device file', () => {
+  it('writes <name>.flock', () => {
     expect(configFileName('/home/u/kitchen-pi.flock')).toBe('kitchen-pi.flock')
-    expect(configFileName('C:\\Users\\u\\kitchen-pi.reswarm')).toBe('kitchen-pi.flock')
+    expect(configFileName('C:\\Users\\u\\Kitchen-Pi.FLOCK')).toBe('Kitchen-Pi.flock')
   })
 
   it('makes the name valid on FAT', () => {

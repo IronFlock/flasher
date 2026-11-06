@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { FlashItem, FlashState, Progress, ReswarmConfig, SupportedBoard } from 'src/types'
+import { FlashItem, FlashState, Progress, FlockConfig, SupportedBoard } from 'src/types'
 import { useDrivesStore } from './drives'
 import { useBoardStore } from './boards'
 import { deepToRaw } from '@renderer/utils'
@@ -45,7 +45,7 @@ export const useFlashStore = () => {
       }
     },
     actions: {
-      // Adds a device file (.flock, .reswarm). FlockFlasher flashes the FlockOS
+      // Adds a device file (.flock). FlockFlasher flashes the FlockOS
       // image chosen for it from the signed catalog; there are no local images.
       async addItem(fullPath: string) {
         const driveStore = useDrivesStore()
@@ -84,7 +84,7 @@ export const useFlashStore = () => {
 
         const configFileString = await window.api.readFile(fullPath)
 
-        const config = JSON.parse(configFileString) as ReswarmConfig
+        const config = JSON.parse(configFileString) as FlockConfig
 
         // Shows the boards, so the catalog is refreshed (at most every 5 minutes);
         // a .flock opened with FlockFlasher arrives before the first load ends.
@@ -93,7 +93,7 @@ export const useFlashStore = () => {
         // else none, and the user chooses. Only catalog boards are flashed.
         config.board = matchBoard(boardStore.boards, config)
 
-        flashItem.reswarm = {
+        flashItem.flock = {
           configPath: fullPath,
           config,
           imageKey: defaultImageKey(config.board)
@@ -105,48 +105,48 @@ export const useFlashStore = () => {
       // one; a device without a board gets the one its file asks for.
       rebindBoards(boards: SupportedBoard[]) {
         for (const item of this.items) {
-          const config = item.reswarm?.config
-          if (!item.reswarm || !config || item.flash.state !== 'idle') continue
+          const config = item.flock?.config
+          if (!item.flock || !config || item.flash.state !== 'idle') continue
           const choice = config.board
             ? rebindChoice(
                 boards,
                 config.board,
-                item.reswarm.imageKey,
-                item.reswarm.installerKey !== undefined
+                item.flock.imageKey,
+                item.flock.installerKey !== undefined
               )
             : { board: matchBoard(boards, config), imageKey: undefined, installerKey: undefined }
           config.board = choice.board
-          item.reswarm.imageKey = choice.imageKey ?? defaultImageKey(choice.board)
-          item.reswarm.installerKey = choice.installerKey
+          item.flock.imageKey = choice.imageKey ?? defaultImageKey(choice.board)
+          item.flock.installerKey = choice.installerKey
         }
       },
       // Chooses the hardware for a device file. Another hardware resets the
       // variant to its default (base, std kernel) and the installation to a
       // direct write; the same one keeps both.
       selectBoard(flashItem: FlashItem, board: SupportedBoard | undefined) {
-        if (!flashItem.reswarm?.config) return
-        const same = board && flashItem.reswarm.config.board?.model === board.model
-        flashItem.reswarm.config.board = board
+        if (!flashItem.flock?.config) return
+        const same = board && flashItem.flock.config.board?.model === board.model
+        flashItem.flock.config.board = board
         if (!same) {
-          flashItem.reswarm.imageKey = defaultImageKey(board)
-          flashItem.reswarm.installerKey = undefined
+          flashItem.flock.imageKey = defaultImageKey(board)
+          flashItem.flock.installerKey = undefined
         }
       },
       // Chooses the variant; the installer stick stays chosen only if it
       // carries the new variant, else the image is written directly.
       selectVariant(flashItem: FlashItem, key: string | undefined) {
-        if (!flashItem.reswarm?.config) return
-        flashItem.reswarm.imageKey = key
-        if (flashItem.reswarm.installerKey !== undefined) {
-          flashItem.reswarm.installerKey = installerKeyFor(flashItem.reswarm.config.board, key)
+        if (!flashItem.flock?.config) return
+        flashItem.flock.imageKey = key
+        if (flashItem.flock.installerKey !== undefined) {
+          flashItem.flock.installerKey = installerKeyFor(flashItem.flock.config.board, key)
         }
       },
       // How to install: write the variant's image to the drive (false), or the
       // board's installer stick that carries it (true).
       selectInstallMethod(flashItem: FlashItem, useInstaller: boolean) {
-        if (!flashItem.reswarm?.config) return
-        flashItem.reswarm.installerKey = useInstaller
-          ? installerKeyFor(flashItem.reswarm.config.board, flashItem.reswarm.imageKey)
+        if (!flashItem.flock?.config) return
+        flashItem.flock.installerKey = useInstaller
+          ? installerKeyFor(flashItem.flock.config.board, flashItem.flock.imageKey)
           : undefined
       },
       async flashDevice(flashItem: FlashItem) {
@@ -159,10 +159,7 @@ export const useFlashStore = () => {
           return
         }
 
-        if (
-          flashItem.reswarm &&
-          (!flashItem.reswarm.config?.board || !flashItem.reswarm.imageKey)
-        ) {
+        if (flashItem.flock && (!flashItem.flock.config?.board || !flashItem.flock.imageKey)) {
           snackstore.setText('errors.no_image_selected')
           snackstore.setColor('error')
           snackstore.setVisible(true)

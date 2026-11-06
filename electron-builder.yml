@@ -1,4 +1,4 @@
-appId: com.recordevolution.flockflasher
+appId: com.ironflock.flockflasher # keep equal to setAppUserModelId in src/main/index.ts
 productName: FlockFlasher
 directories:
   buildResources: build
@@ -25,6 +25,11 @@ win:
     repo: flasher
     updaterCacheDirName: flockflasher-updater
 nsis:
+  # NEVER change. The installer's identity (registry and uninstall keys), by default
+  # derived from appId. Pinned to the value of the old appId
+  # com.recordevolution.flockflasher, so installed apps keep upgrading in place
+  # instead of getting a second copy next to the old one.
+  guid: 85b3a452-7859-50c0-9291-836158c90649
   artifactName: ${name}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
@@ -63,19 +68,11 @@ protocols:
   - name: ironflock-protocol
     schemes:
       - flock
-  - name: reswarm-protocol
-    schemes:
-      - reswarm
 fileAssociations:
   - ext: flock
     description: IronFlock Device File
     icon: src/assets/icons/icon.icns
-    mimeType: text/x-reswarm
-    role: Viewer
-  - ext: reswarm
-    description: Reswarm Device File
-    icon: src/assets/icons/icon.icns
-    mimeType: text/x-reswarm
+    mimeType: text/x-flock
     role: Viewer
 electronVersion: 43.8.4 # keep equal to package.json `electron`
 # NOTE: auto-update publishing is configured per-target (github) in the win/mac/linux

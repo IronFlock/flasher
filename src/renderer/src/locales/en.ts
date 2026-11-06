@@ -103,7 +103,7 @@ export default {
   agent_update_available:
     'An update is available for the IronFlock device agent! Continue by downloading the update.',
   docker_is_required:
-    '<strong>Docker is required</strong>, in order to test your Record Evolution Device.',
+    '<strong>Docker is required</strong>, in order to test your IronFlock device.',
   make_sure_docker_is_running:
     'If you have already installed Docker, make sure the <strong>Docker daemon</strong> is running in the background.',
   docker_please_follow_instructions:

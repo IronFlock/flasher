@@ -49,7 +49,7 @@ values.
 ## Board catalog
 
 FlockFlasher writes nothing but the FlockOS images of one catalog, the signed FlockOS catalog. A
-device is added by its device file (`.flock`, or an older `.reswarm`); the user picks the hardware
+device is added by its device file (`.flock`); the user picks the hardware
 (menu "Hardware") and then its variant (menu "FlockOS variant"). The main process keeps the
 verified catalog, looks up the image there by its key (`<image_id>@<version>`, `imageKey` in
 `src/shared/images.ts`), downloads it, and checks the catalog's size and SHA-256 before it writes
@@ -106,14 +106,6 @@ SHA-256 are checked on the download, which is then decompressed into `~/.Reflash
 from there. For an installer stick the main process checks that the chosen variant is one of the
 stick's payloads in the verified catalog (`CatalogStore.plan`) before it writes anything.
 
-### No ReswarmOS images
-
-FlockFlasher no longer offers ReswarmOS images: it does not read the ReswarmOS catalog
-(`dl/reswarmos/supportedBoardsImages.json`), and it has no ISO repack. Boards that only ReswarmOS
-supports (Raspberry Pi 3 and Zero, 32-bit Arm, the ReswarmOS installer ISO for PCs) need
-FlockFlasher v2.2.4 or older ([releases](https://github.com/IronFlock/flasher/releases)). A
-device's `.reswarm` file still opens, and is written to the device as a `.flock`.
-
 ### The device file on the flashed drive
 
 After writing a `.flock` item, FlockFlasher puts the device file onto the FAT partition labelled
@@ -130,12 +122,11 @@ order (`src/main/utils/config-partition.ts`), and mounts it if the OS did not:
   gets one from `Add-PartitionAccessPath`, or from `diskpart` for an EFI system partition.
 
 The file is synced, and a partition FlockFlasher mounted is unmounted again (on Windows, the drive
-letter it assigned is removed). The device gets `<name>.flock` only, also for a `.reswarm` file;
+letter it assigned is removed). The device gets `<name>.flock` only;
 its enroll removes the file after use, so no copy with the device's credentials is left behind.
 An installer stick also gets `installer.conf` with the one line `payload=<image id>` (the chosen
 variant); every other key keeps the installer's default (`confirm=yes`: it asks on the console
 before it writes).
-The `.flock` and `.reswarm` file associations stay.
 
 ## EtcherSDK
 

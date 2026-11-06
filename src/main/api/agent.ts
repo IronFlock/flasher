@@ -150,7 +150,7 @@ class AgentManager extends EventEmitter {
       `-agentDir=${REFLASHER_CONFIG_PATH}`,
       `-appsDir=${appsDir}`,
       '-config',
-      `${flashItem.reswarm!.configPath}`,
+      `${flashItem.flock!.configPath}`,
       `-logFile=${logFilePath}`,
       '-update=false',
       '-prettyLogging'
