@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref} from 'vue'
+import { ref } from 'vue'
 import prettyBytes from 'pretty-bytes'
 import { useDrivesStore } from '../store/drives'
 
@@ -11,117 +11,97 @@ async function getPlatform() {
 }
 
 getPlatform()
+
+const isCard = (busType?: string) => busType === 'SD' || busType === 'MMC'
 </script>
 <template>
-  <v-container>
-    <v-list-item>
-      <v-toolbar-title>
-        {{ $t('flash_drives') }}
-      </v-toolbar-title>
+  <div class="drawer">
+    <div class="panel-head">
+      <div>
+        <h2 class="t-heading">{{ $t('flash_drives') }}</h2>
+        <p class="t-meta">{{ $t('sd_cards_and_drives') }}</p>
+      </div>
+      <v-tooltip>
+        <template v-slot:activator="{ props }">
+          <v-btn
+            v-bind="props"
+            class="btn-ghost"
+            icon="mdi-refresh"
+            size="small"
+            variant="text"
+            :aria-label="$t('refresh_drive_list')"
+            @click="store.fetchDrives"
+          ></v-btn>
+        </template>
+        <span>{{ $t('refresh_drive_list') }}</span>
+      </v-tooltip>
+    </div>
 
-      <v-list-item-subtitle>
-        {{ $t('sd_cards_and_drives') }}
-      </v-list-item-subtitle>
+    <div v-if="store.drives.length" class="list-card">
+      <div v-for="item in store.drives" :key="item.device" class="row">
+        <span class="icon-tile">
+          <v-icon size="20">
+            {{ isCard(item.busType) ? 'mdi-sd' : 'mdi-usb-flash-drive-outline' }}
+          </v-icon>
+        </span>
 
-      <template v-slot:append>
-        <v-tooltip location="bottom">
-          <template v-slot:activator="{ props }">
-            <v-btn
-              variant="plain"
-              v-bind:="props"
-              icon="mdi-refresh"
-              @click="store.fetchDrives"
-            ></v-btn>
-          </template>
-          <span>{{ $t('refresh_drive_list') }}</span>
-        </v-tooltip>
-      </template>
-    </v-list-item>
+        <div class="row__text">
+          <span class="row__title">{{ item.description }}</span>
+          <span class="row__meta">
+            <span class="mono">{{ item.device }}</span> · {{ prettyBytes(item.size ?? 0) }}
+          </span>
+        </div>
 
-    <v-divider></v-divider>
-
-    <v-list dense nav>
-      <v-list-item v-for="item in store.drives" :key="item.device">
-        <div class="drive-item">
-          <v-tooltip location="bottom">
+        <template v-if="platform !== 'win32'">
+          <v-tooltip v-if="!item.mountpoints.length">
             <template v-slot:activator="{ props }">
-              <v-icon left color="primary" v-bind="props" v-if="item['busType'] === 'USB'">
-                mdi-usb
-              </v-icon>
-              <v-icon
-                left
-                color="accent"
+              <v-btn
                 v-bind="props"
-                v-if="item['busType'] === 'SD' || item['busType'] === 'MMC'"
-              >
-                mdi-sd
-              </v-icon>
+                class="btn-ghost"
+                icon="mdi-eject mdi-rotate-180"
+                size="small"
+                variant="text"
+                :aria-label="$t('mount')"
+                @click="store.mountDrive(item)"
+              ></v-btn>
             </template>
-            <span>{{ item }}</span>
+            <span>{{ $t('mount') }}</span>
           </v-tooltip>
 
-          <div>
-            <v-list-item-title>
-              {{ item.device }}
-            </v-list-item-title>
-            <v-list-item-subtitle>
-              {{ item.description }}
-            </v-list-item-subtitle>
-            <v-list-item-subtitle>{{ prettyBytes(item.size ?? 0) }}</v-list-item-subtitle>
-          </div>
+          <v-tooltip v-else>
+            <template v-slot:activator="{ props }">
+              <v-btn
+                v-bind="props"
+                class="btn-ghost"
+                icon="mdi-eject"
+                size="small"
+                variant="text"
+                :aria-label="$t('unmount')"
+                @click="store.unmountDrive(item)"
+              ></v-btn>
+            </template>
+            <span>{{ $t('unmount') }}</span>
+          </v-tooltip>
+        </template>
+      </div>
+    </div>
 
-          <div class="drive-actions" v-if="platform !== 'win32'">
-            <v-tooltip location="bottom" v-if="!item.mountpoints.length">
-              <template v-slot:activator="{ props }">
-                <v-btn
-                  id="mountButton"
-                  color="primary"
-                  icon="mdi-eject mdi-rotate-180"
-                  size="x-small"
-                  variant="text"
-                  v-bind="props"
-                  @click="store.mountDrive(item)"
-                >
-                </v-btn>
-              </template>
-              <span>{{ $t('mount') }}</span>
-            </v-tooltip>
-
-            <v-tooltip location="bottom" v-if="item.mountpoints.length">
-              <template v-slot:activator="{ props }">
-                <v-btn
-                  icon="mdi-eject"
-                  id="unmountButton"
-                  color="primary"
-                  size="x-small"
-                  variant="text"
-                  v-bind="props"
-                  @click="store.unmountDrive(item)"
-                >
-                </v-btn>
-              </template>
-              <span>{{ $t('unmount') }}</span>
-            </v-tooltip>
-          </div>
-        </div>
-      </v-list-item>
-    </v-list>
-  </v-container>
+    <p v-else class="t-meta drawer__empty">{{ $t('no_drives_available') }}</p>
+  </div>
 </template>
-<style>
-.title {
-  font-size: 1.25rem !important;
-  line-height: 1.75rem !important;
-}
-.drive-item {
+<style scoped>
+.drawer {
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px 16px;
 }
 
-.drive-actions {
-  display: flex;
-  flex: 1;
-  justify-content: flex-end;
-  gap: 5px;
+.panel-head {
+  padding-left: 4px;
+}
+
+.drawer__empty {
+  padding-left: 4px;
 }
 </style>
