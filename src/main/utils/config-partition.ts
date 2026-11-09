@@ -1,5 +1,5 @@
 // Finds and mounts the partition a device file goes to after flashing: the FAT
-// partition labelled FLOCKOS (every FlockOS image has one, the installer stick
+// partition labelled FLOCKOS (every IronFlockOS image has one, the installer stick
 // included), else, as a fallback, the first FAT partition. The partition order
 // is never relied on. Commands run through injected runners (argv, no shell),
 // so the logic is unit-tested without disks or Electron.
@@ -74,7 +74,7 @@ export const chooseConfigPartition = (partitions: PartitionInfo[]): PartitionCho
   return undefined
 }
 
-// The name the device file gets on the partition: <name>.flock (FlockOS reads
+// The name the device file gets on the partition: <name>.flock (IronFlockOS reads
 // *.flock only), made valid on FAT. Nothing else is written; enroll
 // removes the .flock after use, so no copy with the device's credentials stays.
 export const configFileName = (sourcePath: string): string => {
@@ -89,14 +89,14 @@ export const configFileName = (sourcePath: string): string => {
 }
 
 // installer.conf on an installer stick's FLOCKOS partition (KEY=value, read by
-// the FlockOS installer): only `payload`, the id of the image to install; every
+// the IronFlockOS installer): only `payload`, the id of the image to install; every
 // other key keeps its default (confirm=yes: the installer asks on the console
 // before it writes).
 export const INSTALLER_CONF_FILE = 'installer.conf'
 
 export const installerConf = (payload: string): string => {
   if (!/^flockos-[a-z0-9]+(-[a-z0-9]+)*$/.test(payload)) {
-    throw new Error(`Not a FlockOS image id: ${payload}`)
+    throw new Error(`Not an IronFlockOS image id: ${payload}`)
   }
   return `payload=${payload}\n`
 }

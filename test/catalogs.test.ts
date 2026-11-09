@@ -193,10 +193,10 @@ describe('CatalogStore', () => {
     const image = await s.resolve('flockos-amd64-efi-nvidia@0.10.0')
     expect(image.sha256).toBe('05d2f330a2a1a826244eaf61a09e12cabd6ee7fedc9cc03957efd4dc8ea2b6d7')
     await expect(s.resolve('flockos-amd64-efi-base@0.9.0')).rejects.toThrow(
-      /not in the signed FlockOS catalog/
+      /not in the signed IronFlockOS catalog/
     )
     await expect(s.resolve('flockos-raspberrypi4-base-0.10.0.img.gz')).rejects.toThrow(
-      /not in the signed FlockOS catalog/
+      /not in the signed IronFlockOS catalog/
     )
     await expect(s.resolve('https://evil/x.img.gz')).rejects.toThrow(/not in the signed/)
     await expect(s.resolve(undefined)).rejects.toThrow(/choose a board/)

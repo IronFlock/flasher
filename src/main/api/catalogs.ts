@@ -14,7 +14,7 @@ import {
 } from '../security/catalog'
 import { imageKey } from '../../shared/images'
 
-// The boards FlockFlasher offers: those of the signed FlockOS catalog, fetched
+// The boards FlockFlasher offers: those of the signed IronFlockOS catalog, fetched
 // and verified on every start. The main process keeps the verified catalog and
 // resolves the image to flash from it, so a download URL or digest never comes
 // from the renderer or a .flock file. Electron-free (the cache directory and
@@ -81,7 +81,7 @@ export const fetchCapped = async (
 
 export type FlockOSCatalogResult = { catalog: FlockOSCatalog; fromCache: boolean }
 
-// Fetches, verifies and caches the FlockOS catalog. A document that is reached
+// Fetches, verifies and caches the IronFlockOS catalog. A document that is reached
 // but does not verify (unsigned, tampered, wrong key, oversize, not JSON, an
 // invalid payload, older than the one accepted last) is refused with a
 // CatalogError and never replaced by the cache; only an unreachable catalog
@@ -126,7 +126,7 @@ export const loadFlockOSCatalog = async (opts: {
     await writeFile(`${cachePath}.part`, data)
     await rename(`${cachePath}.part`, cachePath)
   } catch (error) {
-    console.error('Could not cache the FlockOS catalog:', error)
+    console.error('Could not cache the IronFlockOS catalog:', error)
   }
   return { catalog, fromCache: false }
 }
@@ -222,7 +222,7 @@ export class CatalogStore {
       })
       this.flockos = catalog
       console.log(
-        `FlockOS catalog issued at ${catalog.issuedAt}, production ${catalog.production}, key ${catalog.keyId}`
+        `IronFlockOS catalog issued at ${catalog.issuedAt}, production ${catalog.production}, key ${catalog.keyId}`
       )
       return {
         // in the catalog's order (amd64-efi first)
@@ -237,7 +237,7 @@ export class CatalogStore {
     } catch (error) {
       const code = error instanceof CatalogError ? error.code : 'unreachable'
       const message = (error as Error)?.message ?? String(error)
-      console.error(`FlockOS catalog refused (${code}): ${message}`)
+      console.error(`IronFlockOS catalog refused (${code}): ${message}`)
       // A failed refresh keeps the boards verified before, with the error.
       const kept = this.flockos
       return {
@@ -262,13 +262,13 @@ export class CatalogStore {
     if (!this.flockos) await this.load()
     if (!this.flockos) {
       throw new Error(
-        'The FlockOS catalog is not available (it did not verify or could not be fetched)'
+        'The IronFlockOS catalog is not available (it did not verify or could not be fetched)'
       )
     }
     const image = this.flockos.boards
       .flatMap((b) => b.latestImages)
       .find((i) => imageKey(i) === key)
-    if (!image) throw new Error(`${key} is not in the signed FlockOS catalog`)
+    if (!image) throw new Error(`${key} is not in the signed IronFlockOS catalog`)
     return image
   }
 

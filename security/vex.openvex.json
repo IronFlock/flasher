@@ -10,7 +10,7 @@
       "products": [{ "@id": "pkg:github/IronFlock/flasher" }],
       "status": "not_affected",
       "justification": "vulnerable_code_cannot_be_controlled_by_adversary",
-      "impact_statement": "file-type 16.5.4 (via etcher-sdk; endless loop in the ASF parser on malformed input). etcher-sdk runs it (fromStream in source-destination.js) only on the image being flashed, and FlockFlasher flashes nothing but images of the signed FlockOS catalog, after checking the download's size and SHA-256 against it (src/main/security/catalog.ts, integrity.ts). The fix (21.3.1) is ESM-only, which etcher-sdk's require() cannot load; drop this when etcher-sdk moves on.",
+      "impact_statement": "file-type 16.5.4 (via etcher-sdk; endless loop in the ASF parser on malformed input). etcher-sdk runs it (fromStream in source-destination.js) only on the image being flashed, and FlockFlasher flashes nothing but images of the signed IronFlockOS catalog, after checking the download's size and SHA-256 against it (src/main/security/catalog.ts, integrity.ts). The fix (21.3.1) is ESM-only, which etcher-sdk's require() cannot load; drop this when etcher-sdk moves on.",
       "timestamp": "2026-11-06T00:00:00Z"
     },
     {

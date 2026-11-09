@@ -145,7 +145,7 @@ const getCatalogImage = async (
   }
 }
 
-// Flashes the FlockOS image a device file asks for, or the installer stick that
+// Flashes the IronFlockOS image a device file asks for, or the installer stick that
 // installs it. There is no other kind of flash: assertFlashRequest refuses
 // anything but a device file with catalog image keys, and what is written is
 // always a catalog image (catalogStore.plan), downloaded and checked here.
@@ -189,7 +189,7 @@ export const flashDevice = async (
     // Copy the file over when the flashing process has exited without an error code
     if (code === 0 && signal === null) {
       try {
-        // Every FlockOS image is a raw image with a FLOCKOS partition
+        // Every IronFlockOS image is a raw image with a FLOCKOS partition
         // (the catalog accepts osvariant "image" only).
         await writeDeviceConfig(flashItem.drive!, configPath, payload)
 

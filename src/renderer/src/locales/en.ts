@@ -33,7 +33,7 @@ export default {
   board: 'Hardware',
   choose_board: 'Choose hardware',
   choose_hardware: 'Hardware',
-  choose_variant: 'FlockOS variant',
+  choose_variant: 'IronFlockOS variant',
   choose_hardware_first: 'Choose the hardware first',
   variants: {
     base: 'Standard',
@@ -46,9 +46,9 @@ export default {
     installer: "Installer stick (installs onto the device's internal disk)"
   },
   catalog: {
-    refused: 'The FlockOS catalog was refused, so no FlockOS images are offered',
-    offline: 'Offline: FlockOS images as listed on {issuedAt}',
-    kept: 'The FlockOS catalog could not be refreshed; the images are those listed on {issuedAt}',
+    refused: 'The IronFlockOS catalog was refused, so no IronFlockOS images are offered',
+    offline: 'Offline: IronFlockOS images as listed on {issuedAt}',
+    kept: 'The IronFlockOS catalog could not be refreshed; the images are those listed on {issuedAt}',
     retry: 'Retry'
   },
   specify_wlan_or_lan: 'Specify WiFi SSID or choose a local network',
@@ -131,9 +131,9 @@ export default {
   errors: {
     invalid_sudo_password: 'The password you have entered is incorrect',
     no_drive_selected: 'Please select a drive to flash your image',
-    no_image_selected: 'Please choose the hardware and a FlockOS variant',
+    no_image_selected: 'Please choose the hardware and an IronFlockOS variant',
     only_device_files:
-      'Add a device by its .flock file: FlockFlasher writes FlockOS images from the signed catalog only'
+      'Add a device by its .flock file: FlockFlasher writes IronFlockOS images from the signed catalog only'
   },
   flashing_state: {
     inactive: 'Inactive',

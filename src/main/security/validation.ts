@@ -123,7 +123,7 @@ type FlashRequest = {
 
 /**
  * Validate a flash request from the renderer: a device file (.flock),
- * the key of a FlockOS catalog image (the variant), and optionally the key of
+ * the key of an IronFlockOS catalog image (the variant), and optionally the key of
  * the installer stick to write instead, which installs that variant. A request
  * cannot name a local image file, a path or a URL to write: the main process
  * resolves the keys against the verified catalog (CatalogStore.plan, which
@@ -144,10 +144,10 @@ export const assertFlashRequest = (
     !flock.config ||
     (flock.configPath !== undefined && flock.configPath !== fullPath)
   ) {
-    throw new Error('Only a device file (.flock) can be flashed, with a FlockOS image')
+    throw new Error('Only a device file (.flock) can be flashed, with an IronFlockOS image')
   }
   if (!isImageKey(flock.imageKey)) {
-    throw new Error('No FlockOS image chosen: choose the hardware and a FlockOS variant')
+    throw new Error('No IronFlockOS image chosen: choose the hardware and an IronFlockOS variant')
   }
   const installerKey = flock.installerKey
   if (installerKey !== undefined && !isImageKey(installerKey)) {
