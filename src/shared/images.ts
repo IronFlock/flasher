@@ -6,7 +6,7 @@
 import type { ImageInfo, SupportedBoard } from '../types'
 
 // The only files FlockFlasher takes: device files. What it flashes is always a
-// FlockOS image of the signed catalog, never a local image file.
+// IronFlockOS image of the signed catalog, never a local image file.
 export const CONFIG_FILE_SUFFIXES = ['.flock'] as const
 export const FILE_DIALOG_EXTENSIONS = ['flock']
 

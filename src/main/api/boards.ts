@@ -7,7 +7,7 @@ import { ImageInfo, Progress } from '../../types'
 import { calculateETA, calculateSpeed, downloadFile } from '../utils'
 import { cachedImageName } from '../../shared/images'
 
-// The boards themselves come from ./catalogs (the signed FlockOS catalog);
+// The boards themselves come from ./catalogs (the signed IronFlockOS catalog);
 // this caches and unpacks their images.
 const CONFIG_PATH = '.Reflasher'
 export const REFLASHER_CONFIG_PATH = path.join(homedir(), CONFIG_PATH)

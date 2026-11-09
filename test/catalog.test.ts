@@ -15,7 +15,7 @@ import {
   parsePublicKeys
 } from '../src/main/security/catalog'
 
-// dl/flockos/manifest.json of FlockOS v0.10.0 as published (2026-11-06), and its
+// dl/flockos/manifest.json of IronFlockOS v0.10.0 as published (2026-11-06), and its
 // decoded payload.
 const fixture = (name: string) =>
   readFileSync(fileURLToPath(new URL(`./fixtures/flockos/${name}`, import.meta.url)))
@@ -69,7 +69,7 @@ describe('catalog keys', () => {
 
   it('rejects the whole list for one bad line, and an empty list', () => {
     expect(() => parsePublicKeys(`${FLOCKOS_CATALOG_PUBLIC_KEYS}\nTODO-KEY\n`)).toThrow(/line 4/)
-    expect(() => parsePublicKeys('# no keys\n')).toThrow(/No FlockOS catalog key/)
+    expect(() => parsePublicKeys('# no keys\n')).toThrow(/No IronFlockOS catalog key/)
     expect(() => parsePublicKeys('AAAA\n')).toThrow(/32-byte/)
   })
 })
@@ -271,7 +271,7 @@ describe('parseCatalogPayload', () => {
     )
   })
 
-  it('refuses anything but a raw image (no ISO repack for FlockOS)', () => {
+  it('refuses anything but a raw image (no ISO repack for IronFlockOS)', () => {
     expectCode(
       () =>
         parseCatalogPayload(

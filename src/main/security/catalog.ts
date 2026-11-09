@@ -2,8 +2,8 @@ import { KeyObject, createHash, createPublicKey, verify } from 'node:crypto'
 import type { ImageInfo, ImageKernel, ImageVariant, SupportedBoard } from '../../types'
 import { isHttpsUrl, isSafePathSegment } from './validation'
 
-// The signed FlockOS catalog, dl/flockos/manifest.json (FlockOS ADR-0009,
-// docs/manifest.schema.json in IronFlock/flockos). It is published as the
+// The signed IronFlockOS catalog, dl/flockos/manifest.json (IronFlockOS ADR-0009,
+// docs/manifest.schema.json in IronFlock/ironflockos). It is published as the
 // device-agent's envelope (device-agent src/updatesig):
 //
 //   {"payload": "<standard base64 of the payload JSON>",
@@ -29,9 +29,9 @@ export const MAX_ENVELOPE_BYTES = 64 * 1024
 // standard base64 raw 32-byte Ed25519 key per line, "#" starts a comment.
 //
 // The line below is the Cloud KMS key ironflock-release/flockos-catalog,
-// version 1 (FlockOS WP-2.6; pki/flockos-catalog.pub in IronFlock/flockos is
+// version 1 (IronFlockOS WP-2.6; pki/flockos-catalog.pub in IronFlock/ironflockos is
 // its PEM form). Rotation: a FlockFlasher release that lists both the old and
-// the new key ships before FlockOS signs with the new one; the old line goes
+// the new key ships before IronFlockOS signs with the new one; the old line goes
 // in a later release.
 export const FLOCKOS_CATALOG_PUBLIC_KEYS = `
 wFLa1T7iHYi20X8JVu/O6JUzBGmW2+tjo7QVMuxsmQg= # key f5e1308e, Cloud KMS ironflock-release/flockos-catalog v1
@@ -91,7 +91,8 @@ export const parsePublicKeys = (list: string): TrustedKey[] => {
     })
     keys.push({ id: keyId(raw), key })
   })
-  if (keys.length === 0) throw new CatalogError('no-keys', 'No FlockOS catalog key is configured')
+  if (keys.length === 0)
+    throw new CatalogError('no-keys', 'No IronFlockOS catalog key is configured')
   return keys
 }
 
@@ -111,7 +112,8 @@ export const openEnvelope = (
   data: Buffer,
   keys: TrustedKey[]
 ): { payload: Buffer; keyId: string } => {
-  if (keys.length === 0) throw new CatalogError('no-keys', 'No FlockOS catalog key is configured')
+  if (keys.length === 0)
+    throw new CatalogError('no-keys', 'No IronFlockOS catalog key is configured')
   if (data.length > MAX_ENVELOPE_BYTES) {
     throw new CatalogError(
       'oversize',
@@ -184,10 +186,10 @@ const unknownPart = (variant: string, kernel: string, architecture: string): str
 }
 
 const skip = (what: string, reason: string) =>
-  console.warn(`FlockOS catalog: skipping ${what}: ${reason} is unknown to this FlockFlasher`)
+  console.warn(`IronFlockOS catalog: skipping ${what}: ${reason} is unknown to this FlockFlasher`)
 
 const invalid = (message: string) =>
-  new CatalogError('invalid', `Invalid FlockOS catalog: ${message}`)
+  new CatalogError('invalid', `Invalid IronFlockOS catalog: ${message}`)
 
 const requireString = (value: unknown, label: string, allowEmpty = false): string => {
   if (typeof value !== 'string' || (!allowEmpty && value === ''))
@@ -237,7 +239,7 @@ const parsePayloads = (
     const image = images.get(id)
     if (!image || image.variant === 'installer' || image.target !== target) {
       console.warn(
-        `FlockOS catalog: dropping payload ${id} of ${label}: not an image of target ${target} in the release`
+        `IronFlockOS catalog: dropping payload ${id} of ${label}: not an image of target ${target} in the release`
       )
     } else if (!payloads.includes(id)) {
       payloads.push(id)
@@ -325,7 +327,7 @@ const parseImage = (
   }
   if (value.osvariant !== 'image') throw invalid(`${label}.osvariant is not "image"`)
   const imageId = requireString(value.image_id, `${label}.image_id`)
-  if (!IMAGE_ID.test(imageId)) throw invalid(`${label}.image_id is not a FlockOS image id`)
+  if (!IMAGE_ID.test(imageId)) throw invalid(`${label}.image_id is not an IronFlockOS image id`)
   const update = requireString(value.update ?? '', `${label}.update`, true)
   if (update !== '' && !isHttpsUrl(update)) throw invalid(`${label}.update is not an https URL`)
 
@@ -392,7 +394,7 @@ const parseBoard = (
     .filter((image): image is ImageInfo => image !== undefined)
   if (latestImages.length === 0) {
     console.warn(
-      `FlockOS catalog: hiding ${label} (${String(value.model)}): no image this FlockFlasher knows`
+      `IronFlockOS catalog: hiding ${label} (${String(value.model)}): no image this FlockFlasher knows`
     )
     return undefined
   }

@@ -25,7 +25,7 @@ export enum RPC {
   InstallUpdate = 'install-update'
 }
 
-// Boards and images come from the signed FlockOS catalog
+// Boards and images come from the signed IronFlockOS catalog
 // (dl/flockos/manifest.json, see the README "Board catalogs"); its boards view
 // keeps the shape of FlockFlasher's earlier catalog.
 export type ImageVariant = 'base' | 'nvidia' | 'installer'

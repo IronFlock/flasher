@@ -114,7 +114,7 @@ describe('installerConf', () => {
 
   it('refuses anything but an image id', () => {
     for (const bad of ['', 'nvidia\nconfirm=no', 'flockos-amd64-efi-base@0.10.0', '../x']) {
-      expect(() => installerConf(bad)).toThrow(/Not a FlockOS image id/)
+      expect(() => installerConf(bad)).toThrow(/Not an IronFlockOS image id/)
     }
   })
 })

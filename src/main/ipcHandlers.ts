@@ -160,7 +160,7 @@ async function handleReadFile(_, filePath: string) {
   return readFile(filePath, { encoding: 'utf8' })
 }
 
-// The boards of the signed FlockOS catalog, fetched and verified again when
+// The boards of the signed IronFlockOS catalog, fetched and verified again when
 // the last load is more than 5 minutes old, or now with `force` (a retry).
 // A catalog that does not verify comes back as an error, with the boards
 // verified before, if any.
@@ -173,7 +173,7 @@ function handleWifiScan() {
 }
 
 async function handleFlashDevice(_, mainWindow: BrowserWindow, flashItem: FlashItem) {
-  // A device file and the key of a FlockOS catalog image, nothing else: no
+  // A device file and the key of an IronFlockOS catalog image, nothing else: no
   // local image file, path or URL. The image is resolved, downloaded and
   // checked from the verified catalog in flashDevice.
   assertFlashRequest(flashItem)

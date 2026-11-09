@@ -36,7 +36,7 @@ const { t } = useI18n()
 // Menu 1: the hardware only.
 const boardTitle = (board: SupportedBoard) => hardwareTitle(board, boards.value)
 
-// Menu 2: the variants of the chosen hardware, the FlockOS version once below.
+// Menu 2: the variants of the chosen hardware, the IronFlockOS version once below.
 const variantTitle = (image: ImageInfo) => {
   const variant = t(`variants.${image.variant}`)
   return image.kernel === 'rt' ? `${variant}, ${t('variants.rt')}` : variant
@@ -45,7 +45,7 @@ const variantTitle = (image: ImageInfo) => {
 const variantHint = (board: SupportedBoard | undefined) => {
   if (!board) return t('choose_hardware_first')
   const version = defaultImage(board.latestImages)?.version
-  return version ? `FlockOS ${version}` : ''
+  return version ? `IronFlockOS ${version}` : ''
 }
 
 // Menu 3, only when the board's installer stick carries the chosen variant.

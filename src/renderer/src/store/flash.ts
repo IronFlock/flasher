@@ -45,7 +45,7 @@ export const useFlashStore = () => {
       }
     },
     actions: {
-      // Adds a device file (.flock). FlockFlasher flashes the FlockOS
+      // Adds a device file (.flock). FlockFlasher flashes the IronFlockOS
       // image chosen for it from the signed catalog; there are no local images.
       async addItem(fullPath: string) {
         const driveStore = useDrivesStore()

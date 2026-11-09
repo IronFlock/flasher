@@ -48,9 +48,9 @@ values.
 
 ## Board catalog
 
-FlockFlasher writes nothing but the FlockOS images of one catalog, the signed FlockOS catalog. A
+FlockFlasher writes nothing but the IronFlockOS images of one catalog, the signed IronFlockOS catalog. A
 device is added by its device file (`.flock`); the user picks the hardware
-(menu "Hardware") and then its variant (menu "FlockOS variant"). The main process keeps the
+(menu "Hardware") and then its variant (menu "IronFlockOS variant"). The main process keeps the
 verified catalog, looks up the image there by its key (`<image_id>@<version>`, `imageKey` in
 `src/shared/images.ts`), downloads it, and checks the catalog's size and SHA-256 before it writes
 it. A flash request can name nothing else: no
@@ -58,11 +58,11 @@ local image file, path or URL (`assertFlashRequest` in `src/main/security/valida
 by the flash IPC handler and again in `flashDevice`). Files the app opens (file dialog, drag and
 drop, file association) are device files only.
 
-### The signed FlockOS catalog
+### The signed IronFlockOS catalog
 
-`https://instance-registry.ironflock.com/dl/flockos/manifest.json`, published by every FlockOS
-release ([FlockOS ADR-0009](https://github.com/IronFlock/flockos/blob/main/docs/adr/0009-phase-2-decisions-hostname-channels-firmware.md),
-[schema](https://github.com/IronFlock/flockos/blob/main/docs/manifest.schema.json)). It is the
+`https://instance-registry.ironflock.com/dl/flockos/manifest.json`, published by every IronFlockOS
+release ([IronFlockOS ADR-0009](https://github.com/IronFlock/ironflockos/blob/main/docs/adr/0009-phase-2-decisions-hostname-channels-firmware.md),
+[schema](https://github.com/IronFlock/ironflockos/blob/main/docs/manifest.schema.json)). It is the
 device-agent's envelope, `{"payload": "<base64 of the payload JSON>", "signature": "<base64 of a
 64-byte Ed25519 signature>"}`, at most 64 KiB, signed over the lines `flockos-manifest:v1`,
 `flockos/manifest.json` and the payload's SHA-256 (lowercase hex), joined by `\n` without a
@@ -70,8 +70,8 @@ trailing newline. `src/main/security/catalog.ts` verifies it with Node's `crypto
 
 - The trusted keys are compiled in as `FLOCKOS_CATALOG_PUBLIC_KEYS` (the Cloud KMS key
   `ironflock-release/flockos-catalog`, version 1, key id `f5e1308e`;
-  [PEM form](https://github.com/IronFlock/flockos/blob/main/pki/flockos-catalog.pub)). To rotate,
-  release a FlockFlasher that lists both keys before FlockOS signs with the new one, and drop the
+  [PEM form](https://github.com/IronFlock/ironflockos/blob/main/pki/flockos-catalog.pub)). To rotate,
+  release a FlockFlasher that lists both keys before IronFlockOS signs with the new one, and drop the
   old line in a later release.
 - A catalog that is unsigned, tampered with, signed by another key, larger than 64 KiB, not JSON,
   of another `schema`, malformed, internally inconsistent (a board's image differs from its
@@ -92,7 +92,7 @@ trailing newline. `src/main/security/catalog.ts` verifies it with Node's `crypto
 The `boards` of the catalog show the production release. The menus of a device:
 
 1. "Hardware": the board (its model name).
-2. "FlockOS variant": the board's images without the installer, `base` (the default), `base` with
+2. "IronFlockOS variant": the board's images without the installer, `base` (the default), `base` with
    the real-time kernel (`rt`) and `nvidia`.
 3. "How to install", only when the board's installer stick carries the chosen variant: write the
    variant's image to the drive (the default; the drive becomes the device's boot disk), or write
@@ -101,7 +101,7 @@ The `boards` of the catalog show the production release. The menus of a device:
    (`payloads`); a catalog without them (v0.10.0) means the target's base image. Payload ids that
    are not images of the release and target are dropped with a log line.
 
-Every FlockOS image is a raw image published as `.img.gz` (schema 1 allows nothing else); size and
+Every IronFlockOS image is a raw image published as `.img.gz` (schema 1 allows nothing else); size and
 SHA-256 are checked on the download, which is then decompressed into `~/.Reflasher` and written
 from there. For an installer stick the main process checks that the chosen variant is one of the
 stick's payloads in the verified catalog (`CatalogStore.plan`) before it writes anything.
@@ -109,7 +109,7 @@ stick's payloads in the verified catalog (`CatalogStore.plan`) before it writes 
 ### The device file on the flashed drive
 
 After writing a `.flock` item, FlockFlasher puts the device file onto the FAT partition labelled
-`FLOCKOS` (every FlockOS image has one, the installer stick included), or, as a fallback, onto the
+`FLOCKOS` (every IronFlockOS image has one, the installer stick included), or, as a fallback, onto the
 first FAT partition. It finds the partition by label and file system, not by
 order (`src/main/utils/config-partition.ts`), and mounts it if the OS did not:
 
