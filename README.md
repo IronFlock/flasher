@@ -128,6 +128,39 @@ An installer stick also gets `installer.conf` with the one line `payload=<image 
 variant); every other key keeps the installer's default (`confirm=yes`: it asks on the console
 before it writes).
 
+## Command line
+
+`flockflasher` installs IronFlockOS without the app, for scripts, servers and machines without a
+desktop. It is one JavaScript file for Node 18 or later (`out/cli/flockflasher.cjs`, built by
+`npm run build:cli` or `just cli`) with nothing but Node's own modules, so it runs wherever it is
+copied. It writes disks on Linux and macOS; on Windows only `images` works.
+
+```sh
+node flockflasher.cjs images                 # the images of the signed catalog
+node flockflasher.cjs drives                 # the disks it can write (--all: every disk, and why not)
+sudo node flockflasher.cjs flash --flock kitchen-pi.flock --device /dev/sdb --image rpi-arm64-base
+```
+
+`flash` takes the image of the `.flock`'s hardware when its architecture has only one (amd64:
+the PC), else the one `--image` names. `--installer` writes the installer stick that installs
+that image instead, and `--installer-disk`, `--installer-confirm`, `--installer-after` and
+`--installer-allow-usb` set the other keys of `installer.conf` (an unattended install:
+`--installer-confirm no`). `--wifi-ssid` and `--wifi-password` put a WiFi network into the copy of
+the `.flock` on the disk, as the app's WiFi fields do. It asks before it erases the disk, unless
+`--yes`. `flockflasher help` lists every option.
+
+It shares the app's code for what must not differ: the signed catalog (`src/main/security/catalog.ts`,
+`src/main/api/catalogs.ts`, the same cache in `~/.Reflasher`), the image's size and SHA-256, and
+the device file on the `FLOCKOS` partition (`src/main/utils/device-files.ts`). It writes without
+etcher-sdk, so it needs no native modules (`src/cli/write.ts`): the `.img.gz` is decompressed as
+it is read, written in 4 MiB blocks (to `/dev/rdiskN` on macOS) and synced, then read back and
+compared (`--no-verify` skips that). Before it writes, it checks the disk (`src/cli/disks.ts`): a
+whole disk, writable, not the disk of the running system (`/`, `/boot`, swap, a live system's
+medium), not held by LVM, RAID or dm-crypt, and on macOS not an internal disk unless its medium is
+removable (the built-in SD card reader). It unmounts what the disk has mounted; on Linux it opens
+the disk with `O_EXCL`, which fails while anything still uses it. `--image-file` writes a
+downloaded `.img.gz` instead of downloading it, if it is the catalog's (same size and SHA-256).
+
 ## EtcherSDK
 
 FlockFlasher uses the etcher-sdk to flash and mount drives.

@@ -89,16 +89,49 @@ export const configFileName = (sourcePath: string): string => {
 }
 
 // installer.conf on an installer stick's FLOCKOS partition (KEY=value, read by
-// the IronFlockOS installer): only `payload`, the id of the image to install; every
-// other key keeps its default (confirm=yes: the installer asks on the console
-// before it writes).
+// the IronFlockOS installer, profiles/installer/overlay/usr/lib/flockos/
+// installer-lib.sh in IronFlock/ironflockos): `payload`, the id of the image to
+// install, and the keys set in `options`; every other key keeps the installer's
+// default (confirm=yes: the installer asks on the console before it writes).
+// FlockFlasher writes `payload` only; the command-line tool may set the others.
 export const INSTALLER_CONF_FILE = 'installer.conf'
 
-export const installerConf = (payload: string): string => {
+export type InstallerOptions = {
+  // largest | /dev/<name> | by-id:<id> (default largest)
+  disk?: string
+  // ask on the console before writing (default true)
+  confirm?: boolean
+  // default poweroff
+  after?: 'poweroff' | 'reboot'
+  // also offer USB disks as targets (default false)
+  allowUsb?: boolean
+}
+
+// The values the installer accepts (installer_conf in installer-lib.sh).
+const INSTALLER_DISK = /^(largest|\/dev\/[a-zA-Z0-9]+|by-id:[A-Za-z0-9_.:-]+)$/
+
+export const installerConf = (payload: string, options: InstallerOptions = {}): string => {
   if (!/^flockos-[a-z0-9]+(-[a-z0-9]+)*$/.test(payload)) {
     throw new Error(`Not an IronFlockOS image id: ${payload}`)
   }
-  return `payload=${payload}\n`
+  const lines = [`payload=${payload}`]
+  if (options.disk !== undefined) {
+    if (!INSTALLER_DISK.test(options.disk)) {
+      throw new Error(
+        `The installer's disk must be largest, /dev/<name> or by-id:<id>, not ${options.disk}`
+      )
+    }
+    lines.push(`disk=${options.disk}`)
+  }
+  if (options.confirm !== undefined) lines.push(`confirm=${options.confirm ? 'yes' : 'no'}`)
+  if (options.after !== undefined) {
+    if (options.after !== 'poweroff' && options.after !== 'reboot') {
+      throw new Error(`The installer's after must be poweroff or reboot, not ${options.after}`)
+    }
+    lines.push(`after=${options.after}`)
+  }
+  if (options.allowUsb !== undefined) lines.push(`allow-usb=${options.allowUsb ? 'yes' : 'no'}`)
+  return lines.join('\n') + '\n'
 }
 
 // ----------------------------------------------------------------- parsers --

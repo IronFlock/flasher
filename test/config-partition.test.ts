@@ -117,6 +117,38 @@ describe('installerConf', () => {
       expect(() => installerConf(bad)).toThrow(/Not an IronFlockOS image id/)
     }
   })
+
+  it('writes the options the installer reads', () => {
+    expect(
+      installerConf('flockos-amd64-efi-base', {
+        disk: 'by-id:nvme-Samsung_SSD_980_1TB_S64ANS0T',
+        confirm: false,
+        after: 'reboot',
+        allowUsb: true
+      })
+    ).toBe(
+      'payload=flockos-amd64-efi-base\ndisk=by-id:nvme-Samsung_SSD_980_1TB_S64ANS0T\nconfirm=no\nafter=reboot\nallow-usb=yes\n'
+    )
+    expect(installerConf('flockos-amd64-efi-base', { disk: '/dev/nvme0n1', confirm: true })).toBe(
+      'payload=flockos-amd64-efi-base\ndisk=/dev/nvme0n1\nconfirm=yes\n'
+    )
+  })
+
+  it('refuses a value the installer would refuse', () => {
+    for (const disk of [
+      '',
+      'smallest',
+      '/dev/sda 1',
+      '/dev/../sda',
+      'by-id:a/b',
+      'largest\nconfirm=no'
+    ]) {
+      expect(() => installerConf('flockos-amd64-efi-base', { disk }), disk).toThrow(/disk must be/)
+    }
+    expect(() => installerConf('flockos-amd64-efi-base', { after: 'halt' as never })).toThrow(
+      /after must be/
+    )
+  })
 })
 
 // ---------------------------------------------------------------- linux --

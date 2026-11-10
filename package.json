@@ -19,7 +19,8 @@
     "postinstall": "node scripts/postinstall.js",
     "dev": "electron-vite dev",
     "dev:debug": "electron-vite dev --inspect",
-    "build": "npm run typecheck && electron-vite build"
+    "build": "npm run typecheck && electron-vite build && npm run build:cli",
+    "build:cli": "vite build -c vite.cli.config.ts"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",

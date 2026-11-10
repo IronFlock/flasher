@@ -7,12 +7,14 @@ Electron desktop app (by IronFlock) for flashing IronFlockOS onto IoT devices. T
 ```bash
 npm run dev            # Development mode with HMR (electron-vite)
 npm run dev:debug      # Dev mode with --inspect for the main process
-npm run build          # Typecheck + electron-vite build
+npm run build          # Typecheck + electron-vite build + the command-line tool
+npm run build:cli      # The command-line tool only: out/cli/flockflasher.cjs (vite.cli.config.ts)
 npm run typecheck      # tsc for main/preload (tsconfig.node.json) + vue-tsc for renderer (tsconfig.web.json)
 npm test               # Vitest unit tests (test/*.test.ts) — pure logic in src/main/security + utils
 npm run test:watch     # Vitest watch mode
 npm run lint           # ESLint 9 flat config (eslint.config.mjs) with --fix
 npm run format         # Prettier (owns formatting; eslint uses flat/essential + skip-formatting)
+just cli ARGS          # Build the command-line tool and run it (images, drives; flash needs sudo node out/cli/flockflasher.cjs)
 just package           # This OS's installer into dist/ (just natives + build + installer), never publishes
 just release-patch     # Release PR (-minor/-major); its merge builds, publishes and tags in CI
 just merge [TITLE]     # No-release PR
@@ -58,7 +60,10 @@ The main process runs as **root**, and `.flock` files plus board metadata are **
 ### Flash pipeline for `.flock` items (`flashDevice` in `flash.ts`)
 1. The config file is JSON; the renderer matches a board (`matchBoard`: the file's board model, or the one board of its `architecture`; else the user chooses) and its default variant (`defaultImage`: `base` with the `std` kernel); the user may pick another hardware, variant (`variantImages`: `base`, `base` rt, `nvidia`; never the installer) and, when the board's installer stick carries the variant (`installerFor`, its `payloads`), how to install (`installerKey`). The main process resolves the keys against its verified catalog (`CatalogStore.plan`, which refuses a payload the stick does not carry).
 2. The `.img.gz` is downloaded to `~/.Reflasher`, its size and SHA-256 are checked against the catalog, and it is gunzipped there (`boards.ts` / `ImageManager`); skipped if cached.
-3. After the write, the config file goes onto the FAT partition labelled `FLOCKOS`, else the first FAT partition (`utils/config-partition.ts`: `lsblk`/`udisksctl` on Linux, `diskutil` on macOS, PowerShell Storage cmdlets and `diskpart` on Windows; mounted if needed, synced, unmounted again). The device gets `<name>.flock` only; IronFlockOS enroll removes it after use. An installer stick also gets `installer.conf` (`payload=<image id>`).
+3. After the write, the config file goes onto the FAT partition labelled `FLOCKOS`, else the first FAT partition (`utils/config-partition.ts`: `lsblk`/`udisksctl` on Linux, `diskutil` on macOS, PowerShell Storage cmdlets and `diskpart` on Windows; mounted if needed, synced, unmounted again). The device gets `<name>.flock` only; IronFlockOS enroll removes it after use. An installer stick also gets `installer.conf` (`payload=<image id>`). The writing of these files is `utils/device-files.ts`, shared with the command-line tool.
+
+### Command-line tool (`src/cli/`, README "Command line")
+`flockflasher images|drives|flash`, built by `vite.cli.config.ts` into one CommonJS file for Node 18+ that requires Node's own modules only, so `src/cli/` and what it imports must stay free of Electron, `@electron-toolkit/*` and npm dependencies (`src/main/utils/index.ts` and `permissions.ts` import Electron: never import them from the CLI's modules). It shares the signed catalog (`security/catalog.ts`, `api/catalogs.ts`), the download (`utils/download.ts`), the image checks, the image choice (`shared/images.ts`) and the FLOCKOS files (`utils/device-files.ts`, `config-partition.ts`) with the app, and writes without etcher-sdk (`cli/write.ts`: gunzip into 4 MiB blocks, `/dev/rdiskN` on macOS, `O_EXCL` on Linux, read back and compared). `cli/disks.ts` decides which disks it may write (lsblk on Linux, `diskutil -plist` on macOS); Linux and macOS only.
 
 ### Device test mode (`agent.ts`)
 `AgentManager` downloads the `device-agent` binary from the instance registry (verified against its published SHA-256 checksum) into `~/.Reflasher/agent` and can run a "virtual device" locally against a `.flock` config. Requires a running Docker daemon (`hasDocker()`); streams agent logs/state to the renderer.
