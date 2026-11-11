@@ -15,31 +15,26 @@ import {
   sortImages,
   variantImages
 } from '../src/shared/images'
-import {
-  openCatalog,
-  FLOCKOS_CATALOG_PUBLIC_KEYS,
-  parsePublicKeys
-} from '../src/main/security/catalog'
+import { parseCatalogPayload } from '../src/main/security/catalog'
 
 const here = (rel: string) => fileURLToPath(new URL(rel, import.meta.url))
-const boards = openCatalog(
-  readFileSync(here('./fixtures/flockos/manifest.json')),
-  parsePublicKeys(FLOCKOS_CATALOG_PUBLIC_KEYS)
-).boards
+// The v0.10.0 catalog under the IronFlockOS names (unsigned; catalog.test.ts
+// covers the signature).
+const boards = parseCatalogPayload(readFileSync(here('./fixtures/ironflockos/payload.json'))).boards
 const board = (model: string) => boards.find((b) => b.model === model)!
 
 describe('variant selection', () => {
   it('defaults to base with the standard kernel, not latestImages[0]', () => {
     const pc = board('amd64-efi')
     const reordered = [...pc.latestImages].reverse() // installer, base-rt, nvidia, base
-    expect(defaultImage(reordered)?.image_id).toBe('flockos-amd64-efi-base')
-    expect(defaultImageKey(pc)).toBe('flockos-amd64-efi-base@0.10.0')
+    expect(defaultImage(reordered)?.image_id).toBe('ironflockos-amd64-efi-base')
+    expect(defaultImageKey(pc)).toBe('ironflockos-amd64-efi-base@0.10.0')
   })
 
   it('falls back to any base, then to the first image', () => {
     const pc = board('amd64-efi')
     const noStd = pc.latestImages.filter((i) => i.kernel === 'rt' || i.variant !== 'base')
-    expect(defaultImage(noStd)?.image_id).toBe('flockos-amd64-efi-base-rt')
+    expect(defaultImage(noStd)?.image_id).toBe('ironflockos-amd64-efi-base-rt')
     // the installer stick is never a variant, so never the default
     const onlyInstaller = pc.latestImages.filter((i) => i.variant === 'installer')
     expect(defaultImage(onlyInstaller)).toBeUndefined()
@@ -49,16 +44,16 @@ describe('variant selection', () => {
 
   it('orders base, base rt, nvidia, installer', () => {
     expect(sortImages(board('amd64-efi').latestImages).map((i) => i.image_id)).toEqual([
-      'flockos-amd64-efi-base',
-      'flockos-amd64-efi-base-rt',
-      'flockos-amd64-efi-nvidia',
-      'flockos-amd64-efi-installer'
+      'ironflockos-amd64-efi-base',
+      'ironflockos-amd64-efi-base-rt',
+      'ironflockos-amd64-efi-nvidia',
+      'ironflockos-amd64-efi-installer'
     ])
   })
 
   it('keys images by id and version', () => {
     const rpi = board('raspberrypi5').latestImages[0]
-    expect(imageKey(rpi)).toBe('flockos-rpi-arm64-base@0.10.0')
+    expect(imageKey(rpi)).toBe('ironflockos-rpi-arm64-base@0.10.0')
     // the same image under both Pi boards
     expect(imageKey(board('raspberrypi4').latestImages[0])).toBe(imageKey(rpi))
   })
@@ -102,8 +97,8 @@ describe('file names', () => {
   })
 
   it('caches a catalog image decompressed', () => {
-    expect(cachedImageName('flockos-amd64-efi-base-0.10.0.img.gz')).toBe(
-      'flockos-amd64-efi-base-0.10.0.img'
+    expect(cachedImageName('ironflockos-amd64-efi-base-0.10.0.img.gz')).toBe(
+      'ironflockos-amd64-efi-base-0.10.0.img'
     )
   })
 })
@@ -116,9 +111,9 @@ describe('rebindChoice', () => {
   }))
 
   it('keeps the board and the variant on a new release', () => {
-    const choice = rebindChoice(next, board('amd64-efi'), 'flockos-amd64-efi-nvidia@0.10.0')
+    const choice = rebindChoice(next, board('amd64-efi'), 'ironflockos-amd64-efi-nvidia@0.10.0')
     expect(choice.board).toBe(next[0])
-    expect(choice.imageKey).toBe('flockos-amd64-efi-nvidia@0.11.0')
+    expect(choice.imageKey).toBe('ironflockos-amd64-efi-nvidia@0.11.0')
   })
 
   it('falls back to the default image when the variant is gone', () => {
@@ -127,13 +122,14 @@ describe('rebindChoice', () => {
       latestImages: b.latestImages.filter((i) => i.variant !== 'nvidia')
     }))
     expect(
-      rebindChoice(withoutNvidia, board('amd64-efi'), 'flockos-amd64-efi-nvidia@0.10.0').imageKey
-    ).toBe('flockos-amd64-efi-base@0.11.0')
+      rebindChoice(withoutNvidia, board('amd64-efi'), 'ironflockos-amd64-efi-nvidia@0.10.0')
+        .imageKey
+    ).toBe('ironflockos-amd64-efi-base@0.11.0')
   })
 
   it('drops a board the catalog no longer lists', () => {
     expect(
-      rebindChoice(next.slice(1), board('amd64-efi'), 'flockos-amd64-efi-base@0.10.0')
+      rebindChoice(next.slice(1), board('amd64-efi'), 'ironflockos-amd64-efi-base@0.10.0')
     ).toEqual({ board: undefined, imageKey: undefined })
     expect(rebindChoice(next, undefined, undefined)).toEqual({
       board: undefined,
@@ -160,7 +156,11 @@ describe('hardwareTitle', () => {
 })
 
 describe('variants and the installer stick', () => {
-  const ALL = ['flockos-amd64-efi-base', 'flockos-amd64-efi-base-rt', 'flockos-amd64-efi-nvidia']
+  const ALL = [
+    'ironflockos-amd64-efi-base',
+    'ironflockos-amd64-efi-base-rt',
+    'ironflockos-amd64-efi-nvidia'
+  ]
   // amd64-efi with an installer that carries every variant
   const pcCarryingAll = {
     ...board('amd64-efi'),
@@ -172,28 +172,28 @@ describe('variants and the installer stick', () => {
   it('offers the variants without the installer, in order', () => {
     expect(variantImages(board('amd64-efi')).map((i) => i.image_id)).toEqual(ALL)
     expect(variantImages(board('raspberrypi5')).map((i) => i.image_id)).toEqual([
-      'flockos-rpi-arm64-base'
+      'ironflockos-rpi-arm64-base'
     ])
     expect(variantImages(undefined)).toEqual([])
   })
 
   it('offers the installer stick only for a variant it carries (v0.10.0: base)', () => {
     const pc = board('amd64-efi')
-    expect(installerKeyFor(pc, 'flockos-amd64-efi-base@0.10.0')).toBe(
-      'flockos-amd64-efi-installer@0.10.0'
+    expect(installerKeyFor(pc, 'ironflockos-amd64-efi-base@0.10.0')).toBe(
+      'ironflockos-amd64-efi-installer@0.10.0'
     )
-    expect(installerFor(pc, 'flockos-amd64-efi-base-rt@0.10.0')).toBeUndefined()
-    expect(installerFor(pc, 'flockos-amd64-efi-nvidia@0.10.0')).toBeUndefined()
-    expect(installerFor(pc, 'flockos-amd64-efi-installer@0.10.0')).toBeUndefined()
+    expect(installerFor(pc, 'ironflockos-amd64-efi-base-rt@0.10.0')).toBeUndefined()
+    expect(installerFor(pc, 'ironflockos-amd64-efi-nvidia@0.10.0')).toBeUndefined()
+    expect(installerFor(pc, 'ironflockos-amd64-efi-installer@0.10.0')).toBeUndefined()
     expect(installerFor(pc, undefined)).toBeUndefined()
     // no installer for the Pis
-    expect(installerFor(board('raspberrypi4'), 'flockos-rpi-arm64-base@0.10.0')).toBeUndefined()
+    expect(installerFor(board('raspberrypi4'), 'ironflockos-rpi-arm64-base@0.10.0')).toBeUndefined()
   })
 
   it('offers it for every variant a stick carries', () => {
     for (const id of ALL) {
       expect(installerKeyFor(pcCarryingAll, `${id}@0.10.0`)).toBe(
-        'flockos-amd64-efi-installer@0.10.0'
+        'ironflockos-amd64-efi-installer@0.10.0'
       )
     }
   })
@@ -202,22 +202,22 @@ describe('variants and the installer stick', () => {
     const next = [pcCarryingAll, board('raspberrypi4')].map((b) => ({
       ...b,
       latestImages: b.latestImages.map((i) =>
-        i.image_id === 'flockos-amd64-efi-installer'
-          ? { ...i, version: '0.11.0', payloads: ['flockos-amd64-efi-base'] }
+        i.image_id === 'ironflockos-amd64-efi-installer'
+          ? { ...i, version: '0.11.0', payloads: ['ironflockos-amd64-efi-base'] }
           : { ...i, version: '0.11.0' }
       )
     }))
     const pc = board('amd64-efi')
-    expect(rebindChoice(next, pc, 'flockos-amd64-efi-base@0.10.0', true)).toMatchObject({
-      imageKey: 'flockos-amd64-efi-base@0.11.0',
-      installerKey: 'flockos-amd64-efi-installer@0.11.0'
+    expect(rebindChoice(next, pc, 'ironflockos-amd64-efi-base@0.10.0', true)).toMatchObject({
+      imageKey: 'ironflockos-amd64-efi-base@0.11.0',
+      installerKey: 'ironflockos-amd64-efi-installer@0.11.0'
     })
-    expect(rebindChoice(next, pc, 'flockos-amd64-efi-nvidia@0.10.0', true)).toMatchObject({
-      imageKey: 'flockos-amd64-efi-nvidia@0.11.0',
+    expect(rebindChoice(next, pc, 'ironflockos-amd64-efi-nvidia@0.10.0', true)).toMatchObject({
+      imageKey: 'ironflockos-amd64-efi-nvidia@0.11.0',
       installerKey: undefined
     })
     expect(
-      rebindChoice(next, pc, 'flockos-amd64-efi-base@0.10.0', false).installerKey
+      rebindChoice(next, pc, 'ironflockos-amd64-efi-base@0.10.0', false).installerKey
     ).toBeUndefined()
   })
 })

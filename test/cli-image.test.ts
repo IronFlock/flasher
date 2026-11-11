@@ -14,8 +14,8 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
 const BYTES = Buffer.from('the image of the catalog')
 const image = {
-  file: 'flockos-amd64-efi-base-0.13.0.img.gz',
-  download: 'https://dl.example/flockos/0.13.0/flockos-amd64-efi-base-0.13.0.img.gz',
+  file: 'ironflockos-amd64-efi-base-0.13.0.img.gz',
+  download: 'https://dl.example/ironflockos/0.13.0/ironflockos-amd64-efi-base-0.13.0.img.gz',
   size: BYTES.length,
   sha256: createHash('sha256').update(BYTES).digest('hex')
 } as ImageInfo

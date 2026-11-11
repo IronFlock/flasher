@@ -30,21 +30,21 @@ describe('chooseConfigPartition', () => {
     ...extra
   })
 
-  it('takes the FAT partition labelled FLOCKOS, wherever it is', () => {
+  it('takes the FAT partition labelled IRONFLOCKOS, wherever it is', () => {
     const choice = chooseConfigPartition([
       part(3, { fsType: 'ext4', label: 'rootfs-a' }),
       part(1, { fsType: 'vfat', label: 'boot-a' }),
-      part(2, { fsType: 'vfat', label: 'FLOCKOS' })
+      part(2, { fsType: 'vfat', label: 'IRONFLOCKOS' })
     ])
     expect(choice).toEqual({ partition: expect.objectContaining({ index: 2 }), reason: 'label' })
   })
 
   it('matches the label without regard to case or padding, but only on FAT', () => {
-    expect(chooseConfigPartition([part(1, { fsType: 'FAT32', label: ' flockos ' })])?.reason).toBe(
-      'label'
-    )
+    expect(
+      chooseConfigPartition([part(1, { fsType: 'FAT32', label: ' ironflockos ' })])?.reason
+    ).toBe('label')
     const choice = chooseConfigPartition([
-      part(1, { fsType: 'ext4', label: 'FLOCKOS' }),
+      part(1, { fsType: 'ext4', label: 'IRONFLOCKOS' }),
       part(2, { fsType: 'vfat', label: 'BOOT' })
     ])
     expect(choice).toEqual({
@@ -109,29 +109,37 @@ describe('configFileName', () => {
 
 describe('installerConf', () => {
   it('names the image the installer stick installs, nothing else', () => {
-    expect(installerConf('flockos-amd64-efi-nvidia')).toBe('payload=flockos-amd64-efi-nvidia\n')
+    expect(installerConf('ironflockos-amd64-efi-nvidia')).toBe(
+      'payload=ironflockos-amd64-efi-nvidia\n'
+    )
   })
 
   it('refuses anything but an image id', () => {
-    for (const bad of ['', 'nvidia\nconfirm=no', 'flockos-amd64-efi-base@0.10.0', '../x']) {
+    for (const bad of [
+      '',
+      'nvidia\nconfirm=no',
+      'ironflockos-amd64-efi-base@0.10.0',
+      'flockos-amd64-efi-base',
+      '../x'
+    ]) {
       expect(() => installerConf(bad)).toThrow(/Not an IronFlockOS image id/)
     }
   })
 
   it('writes the options the installer reads', () => {
     expect(
-      installerConf('flockos-amd64-efi-base', {
+      installerConf('ironflockos-amd64-efi-base', {
         disk: 'by-id:nvme-Samsung_SSD_980_1TB_S64ANS0T',
         confirm: false,
         after: 'reboot',
         allowUsb: true
       })
     ).toBe(
-      'payload=flockos-amd64-efi-base\ndisk=by-id:nvme-Samsung_SSD_980_1TB_S64ANS0T\nconfirm=no\nafter=reboot\nallow-usb=yes\n'
+      'payload=ironflockos-amd64-efi-base\ndisk=by-id:nvme-Samsung_SSD_980_1TB_S64ANS0T\nconfirm=no\nafter=reboot\nallow-usb=yes\n'
     )
-    expect(installerConf('flockos-amd64-efi-base', { disk: '/dev/nvme0n1', confirm: true })).toBe(
-      'payload=flockos-amd64-efi-base\ndisk=/dev/nvme0n1\nconfirm=yes\n'
-    )
+    expect(
+      installerConf('ironflockos-amd64-efi-base', { disk: '/dev/nvme0n1', confirm: true })
+    ).toBe('payload=ironflockos-amd64-efi-base\ndisk=/dev/nvme0n1\nconfirm=yes\n')
   })
 
   it('refuses a value the installer would refuse', () => {
@@ -143,9 +151,11 @@ describe('installerConf', () => {
       'by-id:a/b',
       'largest\nconfirm=no'
     ]) {
-      expect(() => installerConf('flockos-amd64-efi-base', { disk }), disk).toThrow(/disk must be/)
+      expect(() => installerConf('ironflockos-amd64-efi-base', { disk }), disk).toThrow(
+        /disk must be/
+      )
     }
-    expect(() => installerConf('flockos-amd64-efi-base', { after: 'halt' as never })).toThrow(
+    expect(() => installerConf('ironflockos-amd64-efi-base', { after: 'halt' as never })).toThrow(
       /after must be/
     )
   })
@@ -172,7 +182,7 @@ const RPI_PARTS = [
     name: '/dev/sdb1',
     type: 'part',
     fstype: 'vfat',
-    label: 'FLOCKOS',
+    label: 'IRONFLOCKOS',
     parttype: BASIC_DATA,
     mountpoint: null
   },
@@ -234,7 +244,7 @@ describe('parseLsblk', () => {
     expect(parts[0]).toEqual({
       id: '/dev/sdb1',
       index: 1,
-      label: 'FLOCKOS',
+      label: 'IRONFLOCKOS',
       fsType: 'vfat',
       partType: BASIC_DATA,
       mountpoint: undefined
@@ -255,18 +265,18 @@ describe('parseLsblk', () => {
 })
 
 describe('mountConfigPartition on linux', () => {
-  it('mounts FLOCKOS with udisksctl and unmounts it again', async () => {
+  it('mounts IRONFLOCKOS with udisksctl and unmounts it again', async () => {
     let mounted = false
     const { calls, deps } = fake(({ command, args }) => {
       if (command === 'lsblk' && args.at(-1) === '/dev/sdb1') {
-        return lsblk([{ ...RPI_PARTS[0], mountpoint: mounted ? '/media/u/FLOCKOS' : null }])
+        return lsblk([{ ...RPI_PARTS[0], mountpoint: mounted ? '/media/u/IRONFLOCKOS' : null }])
       }
       if (command === 'lsblk') return lsblk(RPI_PARTS)
       if (command === 'udisksctl' && args[0] === 'mount') mounted = true
       return ''
     })
     const result = await mountConfigPartition('linux', '/dev/sdb', deps)
-    expect(result.mountpoint).toBe('/media/u/FLOCKOS')
+    expect(result.mountpoint).toBe('/media/u/IRONFLOCKOS')
     expect(result.reason).toBe('label')
     expect(commands(calls)).toContain(
       'udisksctl mount --block-device /dev/sdb1 --no-user-interaction'
@@ -278,10 +288,13 @@ describe('mountConfigPartition on linux', () => {
   })
 
   it('uses a partition the desktop already mounted, and leaves it mounted', async () => {
-    const parts = [{ ...RPI_PARTS[0], mountpoint: '/run/media/u/FLOCKOS' }, ...RPI_PARTS.slice(1)]
+    const parts = [
+      { ...RPI_PARTS[0], mountpoint: '/run/media/u/IRONFLOCKOS' },
+      ...RPI_PARTS.slice(1)
+    ]
     const { calls, deps } = fake(({ command }) => (command === 'lsblk' ? lsblk(parts) : ''))
     const result = await mountConfigPartition('linux', '/dev/sdb', deps)
-    expect(result.mountpoint).toBe('/run/media/u/FLOCKOS')
+    expect(result.mountpoint).toBe('/run/media/u/IRONFLOCKOS')
     await result.release()
     expect(commands(calls).some((c) => c.startsWith('udisksctl'))).toBe(false)
   })
@@ -317,7 +330,7 @@ describe('mountConfigPartition on linux', () => {
   it('gives up with the partitions it saw when there is no FAT partition', async () => {
     const { deps } = fake(({ command }) => (command === 'lsblk' ? lsblk([RPI_PARTS[3]]) : ''))
     await expect(mountConfigPartition('linux', '/dev/sdb', deps)).rejects.toThrow(
-      /No FLOCKOS or FAT partition found on \/dev\/sdb \(partitions: \/dev\/sdb4 ext4 rootfs-a\)/
+      /No IRONFLOCKOS or FAT partition found on \/dev\/sdb \(partitions: \/dev\/sdb4 ext4 rootfs-a\)/
     )
   })
 })
@@ -327,7 +340,7 @@ describe('mountConfigPartition on linux', () => {
 const DISKUTIL_LIST = `/dev/disk4 (external, physical):
    #:                       TYPE NAME                    SIZE       IDENTIFIER
    0:      GUID_partition_scheme                        *31.9 GB    disk4
-   1:                        EFI FLOCKOS                 268.4 MB   disk4s1
+   1:                        EFI IRONFLOCKOS             268.4 MB   disk4s1
    2:           Linux Filesystem                         4.3 GB     disk4s2
 `
 
@@ -338,9 +351,9 @@ const diskutilInfo = (id: string, mounted: boolean) =>
    Whole:                     No
    Part of Whole:             disk4
 
-   Volume Name:               FLOCKOS
+   Volume Name:               IRONFLOCKOS
    Mounted:                   ${mounted ? 'Yes' : 'No'}
-${mounted ? '   Mount Point:               /Volumes/FLOCKOS\n' : ''}
+${mounted ? '   Mount Point:               /Volumes/IRONFLOCKOS\n' : ''}
    Partition Type:            EFI
    File System Personality:   MS-DOS FAT32
    Type (Bundle):             msdos
@@ -357,12 +370,12 @@ describe('diskutil parsing', () => {
     expect(parseDiskutilList(DISKUTIL_LIST, 'disk4')).toEqual(['disk4s1', 'disk4s2'])
   })
 
-  it('reads an unmounted EFI system partition labelled FLOCKOS', () => {
+  it('reads an unmounted EFI system partition labelled IRONFLOCKOS', () => {
     const p = darwinPartition('disk4s1', parseDiskutilInfo(diskutilInfo('disk4s1', false)))
     expect(p).toEqual({
       id: 'disk4s1',
       index: 1,
-      label: 'FLOCKOS',
+      label: 'IRONFLOCKOS',
       fsType: 'msdos',
       partType: ESP,
       mountpoint: undefined
@@ -383,7 +396,7 @@ describe('mountConfigPartition on macOS', () => {
       return ''
     })
     const result = await mountConfigPartition('darwin', '/dev/disk4', deps)
-    expect(result.mountpoint).toBe('/Volumes/FLOCKOS')
+    expect(result.mountpoint).toBe('/Volumes/IRONFLOCKOS')
     expect(commands(calls)).toContain('diskutil mount /dev/disk4s1')
     await result.release()
     expect(commands(calls).at(-1)).toBe('diskutil unmount /dev/disk4s1')
@@ -424,13 +437,13 @@ describe('Windows parsing', () => {
 
   it('reads one partition or many, with drive letters', () => {
     const one = parseWindowsPartitions(
-      '{"number":1,"letter":"E","fs":"FAT32","label":"FLOCKOS","gptType":"","mbrType":12}'
+      '{"number":1,"letter":"E","fs":"FAT32","label":"IRONFLOCKOS","gptType":"","mbrType":12}'
     )
     expect(one).toEqual([
       {
         id: '1',
         index: 1,
-        label: 'FLOCKOS',
+        label: 'IRONFLOCKOS',
         fsType: 'FAT32',
         partType: '0x0c',
         mountpoint: 'E:\\'
@@ -455,7 +468,7 @@ describe('mountConfigPartition on Windows', () => {
         number: 1,
         letter,
         fs: letter ? 'FAT32' : '',
-        label: letter ? 'FLOCKOS' : '',
+        label: letter ? 'IRONFLOCKOS' : '',
         gptType: `{${ESP}}`,
         mbrType: 0
       },

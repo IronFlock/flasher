@@ -139,7 +139,7 @@ export const flashDevice = async (
     // Copy the file over when the flashing process has exited without an error code
     if (code === 0 && signal === null) {
       try {
-        // Every IronFlockOS image is a raw image with a FLOCKOS partition
+        // Every IronFlockOS image is a raw image with an IRONFLOCKOS partition
         // (the catalog accepts osvariant "image" only).
         await writeDeviceConfig(flashItem.drive!, configPath, payload)
 

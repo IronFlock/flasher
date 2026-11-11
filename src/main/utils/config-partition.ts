@@ -1,10 +1,10 @@
 // Finds and mounts the partition a device file goes to after flashing: the FAT
-// partition labelled FLOCKOS (every IronFlockOS image has one, the installer stick
+// partition labelled IRONFLOCKOS (every IronFlockOS image has one, the installer stick
 // included), else, as a fallback, the first FAT partition. The partition order
 // is never relied on. Commands run through injected runners (argv, no shell),
 // so the logic is unit-tested without disks or Electron.
 
-export const FLOCKOS_LABEL = 'FLOCKOS'
+export const IRONFLOCKOS_LABEL = 'IRONFLOCKOS'
 
 export type PartitionInfo = {
   // linux: /dev/sdb1; darwin: disk4s1; win32: the partition number
@@ -58,13 +58,13 @@ export const isFatPartitionType = (partType: string | undefined): boolean => {
 const hasFat = (p: PartitionInfo) =>
   isFatFilesystem(p.fsType) || (!p.fsType && isFatPartitionType(p.partType))
 
-// FLOCKOS by FAT label first, then the first FAT file system, then (when the
+// IRONFLOCKOS by FAT label first, then the first FAT file system, then (when the
 // OS could not tell the file system, as Windows for an EFI system partition
 // without a drive letter) the first partition of a FAT partition type.
 export const chooseConfigPartition = (partitions: PartitionInfo[]): PartitionChoice | undefined => {
   const ordered = partitions.slice().sort((a, b) => a.index - b.index)
   const labelled = ordered.find(
-    (p) => (p.label ?? '').trim().toUpperCase() === FLOCKOS_LABEL && hasFat(p)
+    (p) => (p.label ?? '').trim().toUpperCase() === IRONFLOCKOS_LABEL && hasFat(p)
   )
   if (labelled) return { partition: labelled, reason: 'label' }
   const fat = ordered.find((p) => isFatFilesystem(p.fsType))
@@ -88,8 +88,8 @@ export const configFileName = (sourcePath: string): string => {
   return `${stem}.flock`
 }
 
-// installer.conf on an installer stick's FLOCKOS partition (KEY=value, read by
-// the IronFlockOS installer, profiles/installer/overlay/usr/lib/flockos/
+// installer.conf on an installer stick's IRONFLOCKOS partition (KEY=value, read by
+// the IronFlockOS installer, profiles/installer/overlay/usr/lib/ironflockos/
 // installer-lib.sh in IronFlock/ironflockos): `payload`, the id of the image to
 // install, and the keys set in `options`; every other key keeps the installer's
 // default (confirm=yes: the installer asks on the console before it writes).
@@ -111,7 +111,7 @@ export type InstallerOptions = {
 const INSTALLER_DISK = /^(largest|\/dev\/[a-zA-Z0-9]+|by-id:[A-Za-z0-9_.:-]+)$/
 
 export const installerConf = (payload: string, options: InstallerOptions = {}): string => {
-  if (!/^flockos-[a-z0-9]+(-[a-z0-9]+)*$/.test(payload)) {
+  if (!/^ironflockos-[a-z0-9]+(-[a-z0-9]+)*$/.test(payload)) {
     throw new Error(`Not an IronFlockOS image id: ${payload}`)
   }
   const lines = [`payload=${payload}`]
@@ -301,7 +301,7 @@ const waitForChoice = async (
   }
   const found = seen.map((p) => `${p.id} ${p.fsType ?? '?'} ${p.label ?? ''}`.trim()).join(', ')
   throw new Error(
-    `No ${FLOCKOS_LABEL} or FAT partition found on ${device}` +
+    `No ${IRONFLOCKOS_LABEL} or FAT partition found on ${device}` +
       (found ? ` (partitions: ${found})` : '') +
       (lastError ? `: ${(lastError as Error)?.message ?? lastError}` : '')
   )
@@ -383,7 +383,7 @@ const mountDarwin = async (device: string, deps: MountDeps): Promise<MountedConf
   const { partition } = choice
   if (partition.mountpoint) return { ...choice, mountpoint: partition.mountpoint, release: noop }
 
-  // macOS mounts no EFI system partition by itself (FLOCKOS on amd64-efi).
+  // macOS mounts no EFI system partition by itself (IRONFLOCKOS on amd64-efi).
   const node = `/dev/${partition.id}`
   try {
     await deps.run('diskutil', ['mount', node])

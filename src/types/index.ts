@@ -26,7 +26,7 @@ export enum RPC {
 }
 
 // Boards and images come from the signed IronFlockOS catalog
-// (dl/flockos/manifest.json, see the README "Board catalogs"); its boards view
+// (dl/ironflockos/manifest.json, see the README "Board catalogs"); its boards view
 // keeps the shape of FlockFlasher's earlier catalog.
 export type ImageVariant = 'base' | 'nvidia' | 'installer'
 export type ImageKernel = 'std' | 'rt'
@@ -63,7 +63,7 @@ export type SupportedBoard = {
 
 // What RPC.GetSupportedBoards returns. A catalog that does not verify yields
 // no boards and an error, never unverified boards.
-export type FlockOSCatalogStatus =
+export type IronFlockOSCatalogStatus =
   | { ok: true; production: string; issuedAt: string; fromCache: boolean }
   // kept: the last verified catalog, still offered after a refresh failed
   | {
@@ -75,7 +75,7 @@ export type FlockOSCatalogStatus =
 
 export type BoardCatalogs = {
   boards: SupportedBoard[]
-  flockos: FlockOSCatalogStatus
+  ironflockos: IronFlockOSCatalogStatus
 }
 
 export type FlockConfig = {

@@ -5,7 +5,7 @@ import { isSafePathSegment } from '../security/validation'
 import { CommandRunner, mountConfigPartition } from './config-partition'
 
 // Writes the device file (and, on an installer stick, installer.conf) onto a
-// flashed drive: the FAT partition labelled FLOCKOS, else the first FAT
+// flashed drive: the FAT partition labelled IRONFLOCKOS, else the first FAT
 // partition, found by label and file system rather than by order, and mounted
 // for the purpose if the OS did not mount it (macOS and Windows mount no EFI
 // system partition by themselves). Electron-free: FlockFlasher and the
@@ -42,7 +42,7 @@ export const writeDeviceFiles = async (
 ): Promise<void> => {
   for (const { name } of files) {
     if (!isSafePathSegment(name)) {
-      throw new Error(`Not a file name for the FLOCKOS partition: ${name}`)
+      throw new Error(`Not a file name for the IRONFLOCKOS partition: ${name}`)
     }
   }
   const mounted = await mountConfigPartition(platform, device, {

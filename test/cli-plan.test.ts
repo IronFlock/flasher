@@ -10,7 +10,7 @@ const here = (rel: string) => fileURLToPath(new URL(rel, import.meta.url))
 // 0.10.0: amd64-efi (base, nvidia, base-rt, installer carrying base only),
 // arm64-efi, raspberrypi4 and raspberrypi5 (the same image)
 const boards = () =>
-  parseCatalogPayload(readFileSync(here('./fixtures/flockos/payload.json'))).boards
+  parseCatalogPayload(readFileSync(here('./fixtures/ironflockos/payload.json'))).boards
 
 beforeEach(() => {
   vi.spyOn(console, 'warn').mockImplementation(() => undefined)
@@ -19,7 +19,7 @@ beforeEach(() => {
 describe('choosePlan', () => {
   it('takes the base image of the one board of the device file architecture', () => {
     const plan = choosePlan(boards(), { architecture: 'amd64' }, { installer: false })
-    expect(plan.write.image_id).toBe('flockos-amd64-efi-base')
+    expect(plan.write.image_id).toBe('ironflockos-amd64-efi-base')
     expect(plan.payload).toBeUndefined()
     expect(plan.warnings).toEqual([])
   })
@@ -30,32 +30,32 @@ describe('choosePlan', () => {
     )
   })
 
-  it('takes --image with or without the flockos- prefix', () => {
-    expect(normalizeImageId('rpi-arm64-base')).toBe('flockos-rpi-arm64-base')
+  it('takes --image with or without the ironflockos- prefix', () => {
+    expect(normalizeImageId('rpi-arm64-base')).toBe('ironflockos-rpi-arm64-base')
     const plan = choosePlan(
       boards(),
       { architecture: 'arm64' },
       { image: 'rpi-arm64-base', installer: false }
     )
-    expect(plan.write.image_id).toBe('flockos-rpi-arm64-base')
+    expect(plan.write.image_id).toBe('ironflockos-rpi-arm64-base')
     expect(plan.board.board).toBe('raspberrypi')
   })
 
   it('refuses an image the catalog does not have', () => {
     expect(() =>
-      choosePlan(boards(), {}, { image: 'flockos-amd64-efi-desktop', installer: false })
+      choosePlan(boards(), {}, { image: 'ironflockos-amd64-efi-desktop', installer: false })
     ).toThrow(/not an image of the catalog/)
   })
 
   it('writes the installer stick that carries the image, with the image as its payload', () => {
     const plan = choosePlan(boards(), { architecture: 'amd64' }, { installer: true })
-    expect(plan.write.image_id).toBe('flockos-amd64-efi-installer')
-    expect(plan.payload?.image_id).toBe('flockos-amd64-efi-base')
+    expect(plan.write.image_id).toBe('ironflockos-amd64-efi-installer')
+    expect(plan.payload?.image_id).toBe('ironflockos-amd64-efi-base')
   })
 
   it('refuses an installer stick that does not carry the image', () => {
     expect(() => choosePlan(boards(), {}, { image: 'amd64-efi-nvidia', installer: true })).toThrow(
-      /does not carry flockos-amd64-efi-nvidia/
+      /does not carry ironflockos-amd64-efi-nvidia/
     )
   })
 

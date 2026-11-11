@@ -3,9 +3,9 @@ import path from 'node:path'
 import type { BoardCatalogs, ImageInfo } from '../../types'
 import {
   CatalogError,
-  FLOCKOS_CATALOG_PUBLIC_KEYS,
-  FLOCKOS_MANIFEST_URL,
-  FlockOSCatalog,
+  IRONFLOCKOS_CATALOG_PUBLIC_KEYS,
+  IRONFLOCKOS_MANIFEST_URL,
+  IronFlockOSCatalog,
   MAX_ENVELOPE_BYTES,
   TrustedKey,
   assertNotOlder,
@@ -22,7 +22,7 @@ import { imageKey } from '../../shared/images'
 
 // The verified envelope of the catalog last accepted: used when the network is
 // unreachable, and the reference for the rollback check.
-export const FLOCKOS_CATALOG_CACHE_FILE = 'flockos-manifest.json'
+export const IRONFLOCKOS_CATALOG_CACHE_FILE = 'ironflockos-manifest.json'
 
 // A failure to reach the catalog, as opposed to a catalog that was reached and
 // refused. Only the former falls back to the verified cache.
@@ -79,23 +79,23 @@ export const fetchCapped = async (
   return Buffer.concat(chunks)
 }
 
-export type FlockOSCatalogResult = { catalog: FlockOSCatalog; fromCache: boolean }
+export type IronFlockOSCatalogResult = { catalog: IronFlockOSCatalog; fromCache: boolean }
 
 // Fetches, verifies and caches the IronFlockOS catalog. A document that is reached
 // but does not verify (unsigned, tampered, wrong key, oversize, not JSON, an
 // invalid payload, older than the one accepted last) is refused with a
 // CatalogError and never replaced by the cache; only an unreachable catalog
 // falls back to the verified cache. `accepted` is the catalog in use, if any.
-export const loadFlockOSCatalog = async (opts: {
+export const loadIronFlockOSCatalog = async (opts: {
   cacheDir: string
   keys: TrustedKey[]
   url?: string
   fetchFn?: typeof fetch
-  accepted?: FlockOSCatalog
-}): Promise<FlockOSCatalogResult> => {
-  const cachePath = path.join(opts.cacheDir, FLOCKOS_CATALOG_CACHE_FILE)
+  accepted?: IronFlockOSCatalog
+}): Promise<IronFlockOSCatalogResult> => {
+  const cachePath = path.join(opts.cacheDir, IRONFLOCKOS_CATALOG_CACHE_FILE)
 
-  let cached: FlockOSCatalog | undefined
+  let cached: IronFlockOSCatalog | undefined
   try {
     cached = openCatalog(await readFile(cachePath), opts.keys)
   } catch {
@@ -109,7 +109,7 @@ export const loadFlockOSCatalog = async (opts: {
 
   let data: Buffer
   try {
-    data = await fetchCapped(opts.url ?? FLOCKOS_MANIFEST_URL, MAX_ENVELOPE_BYTES, opts.fetchFn)
+    data = await fetchCapped(opts.url ?? IRONFLOCKOS_MANIFEST_URL, MAX_ENVELOPE_BYTES, opts.fetchFn)
   } catch (error) {
     if (error instanceof CatalogUnreachableError && accepted) {
       console.warn(`${error.message}; using the catalog issued at ${accepted.issuedAt}`)
@@ -162,7 +162,7 @@ export class CatalogStore {
   private keys: TrustedKey[] | undefined
   private keysError: CatalogError | undefined
   // the last verified catalog, kept when a later refresh fails
-  private flockos: FlockOSCatalog | undefined
+  private ironflockos: IronFlockOSCatalog | undefined
   private inFlight: Promise<BoardCatalogs> | undefined
   private lastAttemptAt: number | undefined
   private lastResult: BoardCatalogs | undefined
@@ -179,7 +179,7 @@ export class CatalogStore {
   ) {
     this.now = opts.now ?? Date.now
     try {
-      this.keys = parsePublicKeys(opts.keyList ?? FLOCKOS_CATALOG_PUBLIC_KEYS)
+      this.keys = parsePublicKeys(opts.keyList ?? IRONFLOCKOS_CATALOG_PUBLIC_KEYS)
     } catch (error) {
       this.keysError = error as CatalogError
     }
@@ -213,21 +213,21 @@ export class CatalogStore {
   private async doLoad(): Promise<BoardCatalogs> {
     try {
       if (!this.keys) throw this.keysError
-      const { catalog, fromCache } = await loadFlockOSCatalog({
+      const { catalog, fromCache } = await loadIronFlockOSCatalog({
         cacheDir: this.opts.cacheDir,
         keys: this.keys,
         url: this.opts.url,
         fetchFn: this.opts.fetchFn,
-        accepted: this.flockos
+        accepted: this.ironflockos
       })
-      this.flockos = catalog
+      this.ironflockos = catalog
       console.log(
         `IronFlockOS catalog issued at ${catalog.issuedAt}, production ${catalog.production}, key ${catalog.keyId}`
       )
       return {
         // in the catalog's order (amd64-efi first)
         boards: catalog.boards,
-        flockos: {
+        ironflockos: {
           ok: true,
           production: catalog.production,
           issuedAt: catalog.issuedAt,
@@ -239,10 +239,10 @@ export class CatalogStore {
       const message = (error as Error)?.message ?? String(error)
       console.error(`IronFlockOS catalog refused (${code}): ${message}`)
       // A failed refresh keeps the boards verified before, with the error.
-      const kept = this.flockos
+      const kept = this.ironflockos
       return {
         boards: kept?.boards ?? [],
-        flockos: {
+        ironflockos: {
           ok: false,
           code,
           error: message,
@@ -259,13 +259,13 @@ export class CatalogStore {
       throw new Error('No image chosen: choose a board and an OS image')
     }
     // Not loaded yet, or never verified: try once more.
-    if (!this.flockos) await this.load()
-    if (!this.flockos) {
+    if (!this.ironflockos) await this.load()
+    if (!this.ironflockos) {
       throw new Error(
         'The IronFlockOS catalog is not available (it did not verify or could not be fetched)'
       )
     }
-    const image = this.flockos.boards
+    const image = this.ironflockos.boards
       .flatMap((b) => b.latestImages)
       .find((i) => imageKey(i) === key)
     if (!image) throw new Error(`${key} is not in the signed IronFlockOS catalog`)

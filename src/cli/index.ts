@@ -2,9 +2,9 @@ import { execFile } from 'node:child_process'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { createInterface } from 'node:readline/promises'
-import type { FlockOSCatalog } from '../main/security/catalog'
-import { FLOCKOS_CATALOG_PUBLIC_KEYS, parsePublicKeys } from '../main/security/catalog'
-import { loadFlockOSCatalog } from '../main/api/catalogs'
+import type { IronFlockOSCatalog } from '../main/security/catalog'
+import { IRONFLOCKOS_CATALOG_PUBLIC_KEYS, parsePublicKeys } from '../main/security/catalog'
+import { loadIronFlockOSCatalog } from '../main/api/catalogs'
 import { CommandRunner, INSTALLER_CONF_FILE, installerConf } from '../main/utils/config-partition'
 import { DeviceFile, writeDeviceFiles } from '../main/utils/device-files'
 import { sortImages } from '../shared/images'
@@ -88,10 +88,10 @@ const progressLine = (label: string) => {
   }
 }
 
-const loadCatalog = async (cacheDir: string): Promise<FlockOSCatalog> => {
-  const { catalog, fromCache } = await loadFlockOSCatalog({
+const loadCatalog = async (cacheDir: string): Promise<IronFlockOSCatalog> => {
+  const { catalog, fromCache } = await loadIronFlockOSCatalog({
     cacheDir,
-    keys: parsePublicKeys(FLOCKOS_CATALOG_PUBLIC_KEYS)
+    keys: parsePublicKeys(IRONFLOCKOS_CATALOG_PUBLIC_KEYS)
   })
   say(
     `IronFlockOS catalog of ${catalog.issuedAt}, signed with key ${catalog.keyId}` +
@@ -104,7 +104,7 @@ const loadCatalog = async (cacheDir: string): Promise<FlockOSCatalog> => {
 
 type ImageRow = ImageInfo & { hardware: string[] }
 
-const catalogImages = (catalog: FlockOSCatalog): ImageRow[] => {
+const catalogImages = (catalog: IronFlockOSCatalog): ImageRow[] => {
   const rows = new Map<string, ImageRow>()
   for (const board of catalog.boards) {
     for (const image of sortImages(board.latestImages)) {
@@ -295,7 +295,7 @@ export const flash = async (options: FlashOptions, deps: DiskDeps) => {
     uid: process.getuid?.(),
     gid: process.getgid?.()
   })
-  say(`Wrote ${files.map((f) => f.name).join(' and ')} to its FLOCKOS partition`)
+  say(`Wrote ${files.map((f) => f.name).join(' and ')} to its IRONFLOCKOS partition`)
 
   if (plan.payload) {
     const installer = options.installer ?? {}

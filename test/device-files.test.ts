@@ -11,7 +11,7 @@ beforeEach(() => {
 })
 afterEach(() => rmSync(mountpoint, { recursive: true, force: true }))
 
-// lsblk of a flashed stick whose FLOCKOS partition is mounted already.
+// lsblk of a flashed stick whose IRONFLOCKOS partition is mounted already.
 const lsblk = () =>
   JSON.stringify({
     blockdevices: [
@@ -19,7 +19,7 @@ const lsblk = () =>
         name: '/dev/sdb',
         type: 'disk',
         children: [
-          { name: '/dev/sdb1', type: 'part', fstype: 'vfat', label: 'FLOCKOS', mountpoint },
+          { name: '/dev/sdb1', type: 'part', fstype: 'vfat', label: 'IRONFLOCKOS', mountpoint },
           { name: '/dev/sdb2', type: 'part', fstype: 'ext4', label: 'rootfs-a' }
         ]
       }
@@ -27,14 +27,14 @@ const lsblk = () =>
   })
 
 describe('writeDeviceFiles', () => {
-  it('writes the files onto the FLOCKOS partition', async () => {
+  it('writes the files onto the IRONFLOCKOS partition', async () => {
     const run = vi.fn(async () => ({ stdout: lsblk() }))
     await writeDeviceFiles(
       'linux',
       '/dev/sdb',
       [
         { name: 'kitchen-pi.flock', data: Buffer.from('{"name":"kitchen-pi"}') },
-        { name: 'installer.conf', data: Buffer.from('payload=flockos-amd64-efi-base\n') }
+        { name: 'installer.conf', data: Buffer.from('payload=ironflockos-amd64-efi-base\n') }
       ],
       { run, runElevated: run }
     )

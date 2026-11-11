@@ -18,7 +18,7 @@ import {
 const MAX_FLOCK_BYTES = 5 * 1024 * 1024
 
 export type FlockFile = {
-  // the file's name on the FLOCKOS partition
+  // the file's name on the IRONFLOCKOS partition
   name: string
   data: Buffer
   config: Record<string, unknown>
@@ -57,9 +57,9 @@ export type Choice = FlashPlan & { board: SupportedBoard; warnings: string[] }
 
 const allImages = (boards: SupportedBoard[]) => boards.flatMap((b) => b.latestImages)
 
-// --image takes an image id, with or without its flockos- prefix.
+// --image takes an image id, with or without its ironflockos- prefix.
 export const normalizeImageId = (id: string): string =>
-  id.startsWith('flockos-') ? id : `flockos-${id}`
+  id.startsWith('ironflockos-') ? id : `ironflockos-${id}`
 
 // The image to write: --image, else the default variant of the board the
 // device file asks for; with --installer, the board's installer stick that

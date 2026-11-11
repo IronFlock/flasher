@@ -19,7 +19,7 @@ flash    Writes an IronFlockOS image and the device's .flock to a disk:
   -c, --flock FILE         the device file from IronFlock
   -d, --device DISK        the whole disk: /dev/sdX (Linux), /dev/diskN (macOS);
                            everything on it is erased
-  -i, --image ID           the image, for example flockos-amd64-efi-nvidia
+  -i, --image ID           the image, for example ironflockos-amd64-efi-nvidia
                            (default: the base image of the .flock's hardware,
                            when only one hardware has its architecture)
       --installer          write the installer stick that installs the image on
@@ -37,7 +37,7 @@ flash    Writes an IronFlockOS image and the device's .flock to a disk:
   -y, --yes                do not ask before erasing the disk
 
 Every image comes from the signed catalog at
-https://instance-registry.ironflock.com/dl/flockos/manifest.json and is checked
+https://instance-registry.ironflock.com/dl/ironflockos/manifest.json and is checked
 against its size and SHA-256 before it is written. Writing a disk needs root
 (sudo) on Linux and macOS.`
 

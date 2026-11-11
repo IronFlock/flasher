@@ -60,19 +60,19 @@ drop, file association) are device files only.
 
 ### The signed IronFlockOS catalog
 
-`https://instance-registry.ironflock.com/dl/flockos/manifest.json`, published by every IronFlockOS
-release ([IronFlockOS ADR-0009](https://github.com/IronFlock/ironflockos/blob/main/docs/adr/0009-phase-2-decisions-hostname-channels-firmware.md),
+`https://instance-registry.ironflock.com/dl/ironflockos/manifest.json`, published by every
+IronFlockOS release ([IronFlockOS ADR-0009](https://github.com/IronFlock/ironflockos/blob/main/docs/adr/0009-phase-2-decisions-hostname-channels-firmware.md),
 [schema](https://github.com/IronFlock/ironflockos/blob/main/docs/manifest.schema.json)). It is the
 device-agent's envelope, `{"payload": "<base64 of the payload JSON>", "signature": "<base64 of a
-64-byte Ed25519 signature>"}`, at most 64 KiB, signed over the lines `flockos-manifest:v1`,
-`flockos/manifest.json` and the payload's SHA-256 (lowercase hex), joined by `\n` without a
+64-byte Ed25519 signature>"}`, at most 64 KiB, signed over the lines `ironflockos-manifest:v1`,
+`ironflockos/manifest.json` and the payload's SHA-256 (lowercase hex), joined by `\n` without a
 trailing newline. `src/main/security/catalog.ts` verifies it with Node's `crypto`:
 
-- The trusted keys are compiled in as `FLOCKOS_CATALOG_PUBLIC_KEYS` (the Cloud KMS key
-  `ironflock-release/flockos-catalog`, version 1, key id `f5e1308e`;
-  [PEM form](https://github.com/IronFlock/ironflockos/blob/main/pki/flockos-catalog.pub)). To rotate,
-  release a FlockFlasher that lists both keys before IronFlockOS signs with the new one, and drop the
-  old line in a later release.
+- The trusted keys are compiled in as `IRONFLOCKOS_CATALOG_PUBLIC_KEYS` (the Cloud KMS key
+  `ironflock-release/ironflockos-catalog`, version 1, key id `036ef3bd`;
+  [PEM form](https://github.com/IronFlock/ironflockos/blob/main/pki/ironflockos-catalog.pub)).
+  To rotate, release a FlockFlasher that lists both keys before IronFlockOS signs with the new
+  one, and drop the old line in a later release.
 - A catalog that is unsigned, tampered with, signed by another key, larger than 64 KiB, not JSON,
   of another `schema`, malformed, internally inconsistent (a board's image differs from its
   release) or issued before the one accepted last is refused: the app shows the error and offers
@@ -85,9 +85,9 @@ trailing newline. `src/main/security/catalog.ts` verifies it with Node's `crypto
   opening the board list), at most every 5 minutes, and at once with Retry after an error, so a
   release published while the app is open appears without a restart. Idle devices keep their
   board and variant on the new release.
-- The last verified catalog is kept in `~/.Reflasher/flockos-manifest.json`. It is used only when
-  the catalog cannot be reached (network or HTTP error), with a notice. The rollback check is
-  against the newer of it and the catalog in use.
+- The last verified catalog is kept in `~/.Reflasher/ironflockos-manifest.json`. It is used only
+  when the catalog cannot be reached (network or HTTP error), with a notice. The rollback check
+  is against the newer of it and the catalog in use.
 
 The `boards` of the catalog show the production release. The menus of a device:
 
@@ -109,14 +109,14 @@ stick's payloads in the verified catalog (`CatalogStore.plan`) before it writes 
 ### The device file on the flashed drive
 
 After writing a `.flock` item, FlockFlasher puts the device file onto the FAT partition labelled
-`FLOCKOS` (every IronFlockOS image has one, the installer stick included), or, as a fallback, onto the
+`IRONFLOCKOS` (every IronFlockOS image has one, the installer stick included), or, as a fallback, onto the
 first FAT partition. It finds the partition by label and file system, not by
 order (`src/main/utils/config-partition.ts`), and mounts it if the OS did not:
 
 - Linux: `lsblk` (through sudo when the udev database has no file systems yet), `udisksctl mount`,
   else `mount -t vfat` through sudo into a temporary directory.
 - macOS: `diskutil list` and `diskutil info`, `diskutil mount` (through sudo if needed). macOS does
-  not mount an EFI system partition by itself, and `FLOCKOS` is the EFI system partition on
+  not mount an EFI system partition by itself, and `IRONFLOCKOS` is the EFI system partition on
   `amd64-efi` and `arm64-efi`.
 - Windows: PowerShell's Storage cmdlets list the partitions; a partition without a drive letter
   gets one from `Add-PartitionAccessPath`, or from `diskpart` for an EFI system partition.
@@ -151,7 +151,7 @@ the `.flock` on the disk, as the app's WiFi fields do. It asks before it erases 
 
 It shares the app's code for what must not differ: the signed catalog (`src/main/security/catalog.ts`,
 `src/main/api/catalogs.ts`, the same cache in `~/.Reflasher`), the image's size and SHA-256, and
-the device file on the `FLOCKOS` partition (`src/main/utils/device-files.ts`). It writes without
+the device file on the `IRONFLOCKOS` partition (`src/main/utils/device-files.ts`). It writes without
 etcher-sdk, so it needs no native modules (`src/cli/write.ts`): the `.img.gz` is decompressed as
 it is read, written in 4 MiB blocks (to `/dev/rdiskN` on macOS) and synced, then read back and
 compared (`--no-verify` skips that). Before it writes, it checks the disk (`src/cli/disks.ts`): a

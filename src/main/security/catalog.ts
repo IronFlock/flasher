@@ -2,7 +2,7 @@ import { KeyObject, createHash, createPublicKey, verify } from 'node:crypto'
 import type { ImageInfo, ImageKernel, ImageVariant, SupportedBoard } from '../../types'
 import { isHttpsUrl, isSafePathSegment } from './validation'
 
-// The signed IronFlockOS catalog, dl/flockos/manifest.json (IronFlockOS ADR-0009,
+// The signed IronFlockOS catalog, dl/ironflockos/manifest.json (IronFlockOS ADR-0009,
 // docs/manifest.schema.json in IronFlock/ironflockos). It is published as the
 // device-agent's envelope (device-agent src/updatesig):
 //
@@ -11,30 +11,30 @@ import { isHttpsUrl, isSafePathSegment } from './validation'
 //
 // at most 64 KiB, the signature over the ASCII lines
 //
-//   flockos-manifest:v1
-//   flockos/manifest.json
+//   ironflockos-manifest:v1
+//   ironflockos/manifest.json
 //   <lowercase hex SHA-256 of the decoded payload>
 //
 // joined by "\n", no trailing newline. Nothing in an envelope that does not
 // verify is ever used. Electron-free, so it is unit-tested.
 
-export const FLOCKOS_MANIFEST_URL =
-  'https://instance-registry.ironflock.com/dl/flockos/manifest.json'
-export const CATALOG_CONTEXT = 'flockos-manifest:v1'
-export const CATALOG_SUBJECT = 'flockos/manifest.json'
+export const IRONFLOCKOS_MANIFEST_URL =
+  'https://instance-registry.ironflock.com/dl/ironflockos/manifest.json'
+export const CATALOG_CONTEXT = 'ironflockos-manifest:v1'
+export const CATALOG_SUBJECT = 'ironflockos/manifest.json'
 export const MAX_ENVELOPE_BYTES = 64 * 1024
 
 // The keys the catalog may be signed with, in the device-agent's format
-// (FLOCKOS_CATALOG_PUBLIC_KEYS in device-agent src/osupdate/catalog.go): one
+// (IRONFLOCKOS_CATALOG_PUBLIC_KEYS in device-agent src/osupdate/catalog.go): one
 // standard base64 raw 32-byte Ed25519 key per line, "#" starts a comment.
 //
-// The line below is the Cloud KMS key ironflock-release/flockos-catalog,
-// version 1 (IronFlockOS WP-2.6; pki/flockos-catalog.pub in IronFlock/ironflockos is
-// its PEM form). Rotation: a FlockFlasher release that lists both the old and
-// the new key ships before IronFlockOS signs with the new one; the old line goes
-// in a later release.
-export const FLOCKOS_CATALOG_PUBLIC_KEYS = `
-wFLa1T7iHYi20X8JVu/O6JUzBGmW2+tjo7QVMuxsmQg= # key f5e1308e, Cloud KMS ironflock-release/flockos-catalog v1
+// The line below is the Cloud KMS key ironflock-release/ironflockos-catalog,
+// version 1 (pki/ironflockos-catalog.pub in IronFlock/ironflockos is its PEM
+// form). Rotation: a FlockFlasher release that lists both the old and the new
+// key ships before IronFlockOS signs with the new one; the old line goes in a
+// later release.
+export const IRONFLOCKOS_CATALOG_PUBLIC_KEYS = `
++OG0Ylau0tkCKEDT+WGc9RYHOa9VCSxiOGBBTp7IEQc= # key 036ef3bd, Cloud KMS ironflock-release/ironflockos-catalog v1
 `
 
 export type CatalogErrorCode =
@@ -156,7 +156,7 @@ export const openEnvelope = (
 
 // ---------------------------------------------------------------- payload --
 
-export type FlockOSCatalog = {
+export type IronFlockOSCatalog = {
   keyId: string
   issuedAt: string
   issuedAtMs: number
@@ -168,7 +168,7 @@ export type FlockOSCatalog = {
 const VERSION = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$/
 const TIME = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$/
 const SHA256_HEX = /^[0-9a-f]{64}$/
-const IMAGE_ID = /^flockos-[a-z0-9]+(-[a-z0-9]+)*$/
+const IMAGE_ID = /^ironflockos-[a-z0-9]+(-[a-z0-9]+)*$/
 // schema 1: <image-id>-<version>.img.gz
 const IMAGE_FILE = /\.img\.gz$/
 const VARIANTS: readonly string[] = ['base', 'nvidia', 'installer']
@@ -230,7 +230,7 @@ const parsePayloads = (
   target: string,
   images: Map<string, ReleaseImage>
 ): string[] => {
-  const list = raw === undefined ? [`flockos-${target}-base`] : raw
+  const list = raw === undefined ? [`ironflockos-${target}-base`] : raw
   if (!Array.isArray(list) || list.some((id) => typeof id !== 'string')) {
     throw invalid(`${label}.payloads is not a list of image ids`)
   }
@@ -416,7 +416,7 @@ const parseBoard = (
 // board left without images is hidden); fields it uses must be well-formed,
 // and a known board image must match its release, or the whole catalog is
 // refused.
-export const parseCatalogPayload = (payload: Buffer): Omit<FlockOSCatalog, 'keyId'> => {
+export const parseCatalogPayload = (payload: Buffer): Omit<IronFlockOSCatalog, 'keyId'> => {
   let doc: unknown
   try {
     doc = JSON.parse(payload.toString('utf8'))
@@ -454,7 +454,7 @@ export const parseCatalogPayload = (payload: Buffer): Omit<FlockOSCatalog, 'keyI
 }
 
 // Verifies and parses a published catalog.
-export const openCatalog = (data: Buffer, keys: TrustedKey[]): FlockOSCatalog => {
+export const openCatalog = (data: Buffer, keys: TrustedKey[]): IronFlockOSCatalog => {
   const { payload, keyId } = openEnvelope(data, keys)
   return { keyId, ...parseCatalogPayload(payload) }
 }
@@ -462,8 +462,8 @@ export const openCatalog = (data: Buffer, keys: TrustedKey[]): FlockOSCatalog =>
 // A reader refuses a catalog older than the one it last accepted (ADR-0009),
 // so a mirror cannot roll the flasher back to an older signed release.
 export const assertNotOlder = (
-  next: FlockOSCatalog,
-  accepted: FlockOSCatalog | undefined
+  next: IronFlockOSCatalog,
+  accepted: IronFlockOSCatalog | undefined
 ): void => {
   if (accepted && next.issuedAtMs < accepted.issuedAtMs) {
     throw new CatalogError(
