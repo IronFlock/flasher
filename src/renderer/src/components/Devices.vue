@@ -30,7 +30,7 @@ const agentStore = useAgentStore()
 
 const { downloadState } = storeToRefs(agentStore)
 const { drives } = storeToRefs(drivesStore)
-const { boards, flockos } = storeToRefs(boardStore)
+const { boards, ironflockos } = storeToRefs(boardStore)
 const { t } = useI18n()
 
 // Menu 1: the hardware only.
@@ -119,17 +119,17 @@ watch(drives, (updatedDl) => {
       </div>
 
       <v-alert
-        v-if="flockos && !flockos.ok"
+        v-if="ironflockos && !ironflockos.ok"
         class="banner"
         type="error"
         variant="tonal"
         density="compact"
         :title="
-          flockos.kept
-            ? $t('catalog.kept', { issuedAt: flockos.kept.issuedAt })
+          ironflockos.kept
+            ? $t('catalog.kept', { issuedAt: ironflockos.kept.issuedAt })
             : $t('catalog.refused')
         "
-        :text="flockos.error"
+        :text="ironflockos.error"
       >
         <template #append>
           <v-btn size="small" variant="text" @click="boardStore.refresh(true)">
@@ -138,12 +138,12 @@ watch(drives, (updatedDl) => {
         </template>
       </v-alert>
       <v-alert
-        v-else-if="flockos?.ok && flockos.fromCache"
+        v-else-if="ironflockos?.ok && ironflockos.fromCache"
         class="banner"
         type="info"
         variant="tonal"
         density="compact"
-        :text="$t('catalog.offline', { issuedAt: flockos.issuedAt })"
+        :text="$t('catalog.offline', { issuedAt: ironflockos.issuedAt })"
       >
         <template #append>
           <v-btn size="small" variant="text" @click="boardStore.refresh(true)">

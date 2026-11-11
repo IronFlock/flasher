@@ -5,18 +5,17 @@ import { elevatedNodeChildProcess, elevatedSpawn, spawnAsync } from './permissio
 import { FLASH_SCRIPT } from '../security/elevated-scripts'
 import { assertFlashRequest } from '../security/validation'
 import { verifyFileSha256 } from '../security/integrity'
-import { mkdtemp, open, readFile, rename, rm, stat, unlink, writeFile } from 'fs/promises'
+import { readFile, rename, stat, unlink, writeFile } from 'fs/promises'
 import ImageManager, { REFLASHER_CONFIG_PATH } from './boards'
 import { CatalogStore } from './catalogs'
 import {
   CommandRunner,
   INSTALLER_CONF_FILE,
   configFileName,
-  installerConf,
-  mountConfigPartition
+  installerConf
 } from '../utils/config-partition'
+import { DeviceFile, writeDeviceFiles } from '../utils/device-files'
 import { cachedImageName } from '../../shared/images'
-import os from 'os'
 import path from 'path'
 import { Drive } from 'drivelist'
 
@@ -39,68 +38,19 @@ const asRunner =
 const run = asRunner(spawnAsync)
 const runElevated = asRunner(elevatedSpawn)
 
-const writeFileDurably = async (target: string, data: Buffer) => {
-  const handle = await open(target, 'w')
-  try {
-    await handle.writeFile(data)
-    await handle.sync()
-  } finally {
-    await handle.close()
-  }
-}
-
-// Writes the device file onto the flashed drive: the FAT partition labelled
-// FLOCKOS, else the first FAT partition, found by label and file system rather
-// than by order, and mounted for the purpose if the OS did not mount it (macOS
-// and Windows mount no EFI system partition by themselves). On an installer
-// stick, installer.conf names the image it installs (`payload`).
+// Writes the device file onto the flashed drive (utils/device-files.ts). On an
+// installer stick, installer.conf names the image it installs (`payload`).
 const writeDeviceConfig = async (drive: Drive, configPath: string, payload?: string) => {
-  const files: [string, Buffer][] = [[configFileName(configPath), await readFile(configPath)]]
-  if (payload) files.push([INSTALLER_CONF_FILE, Buffer.from(installerConf(payload))])
-  const mounted = await mountConfigPartition(process.platform, drive.device, {
+  const files: DeviceFile[] = [
+    { name: configFileName(configPath), data: await readFile(configPath) }
+  ]
+  if (payload) files.push({ name: INSTALLER_CONF_FILE, data: Buffer.from(installerConf(payload)) })
+  await writeDeviceFiles(process.platform, drive.device, files, {
     run,
     runElevated,
-    makeTempDir: () => mkdtemp(path.join(os.tmpdir(), 'flockflasher-')),
-    removeDir: (dir) => rm(dir, { recursive: true, force: true }),
-    writeTempFile: async (content) => {
-      const file = path.join(await mkdtemp(path.join(os.tmpdir(), 'flockflasher-')), 'assign.txt')
-      await writeFile(file, content)
-      return file
-    },
-    // the temp file sits in a directory of its own
-    removeFile: (file) => rm(path.dirname(file), { recursive: true, force: true }),
     uid: process.getuid?.(),
     gid: process.getgid?.()
   })
-  console.log(
-    `Writing the device file to ${mounted.partition.id} (${mounted.reason}) at ${mounted.mountpoint}`
-  )
-  try {
-    for (const [name, data] of files) {
-      // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal -- name is installer.conf or configFileName(), which has no separators and no leading/trailing dots
-      const target = path.join(mounted.mountpoint, name)
-      try {
-        await writeFileDurably(target, data)
-      } catch (error: any) {
-        // A volume that only mounted through sudo (macOS) belongs to root.
-        if (process.platform === 'win32' || (error?.code !== 'EACCES' && error?.code !== 'EPERM')) {
-          throw error
-        }
-        // A temp copy, so that cp copies only data FlockFlasher made.
-        const dir = await mkdtemp(path.join(os.tmpdir(), 'flockflasher-'))
-        try {
-          await writeFile(path.join(dir, name), data)
-          await runElevated('cp', [path.join(dir, name), target])
-        } finally {
-          await rm(dir, { recursive: true, force: true })
-        }
-      }
-    }
-  } finally {
-    await mounted
-      .release()
-      .catch((error) => console.warn('Could not release the partition:', error))
-  }
 }
 
 // Downloads (or finds in the cache) a catalog image and returns the path of the
@@ -189,7 +139,7 @@ export const flashDevice = async (
     // Copy the file over when the flashing process has exited without an error code
     if (code === 0 && signal === null) {
       try {
-        // Every IronFlockOS image is a raw image with a FLOCKOS partition
+        // Every IronFlockOS image is a raw image with an IRONFLOCKOS partition
         // (the catalog accepts osvariant "image" only).
         await writeDeviceConfig(flashItem.drive!, configPath, payload)
 

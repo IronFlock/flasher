@@ -1,16 +1,16 @@
 import { defineStore } from 'pinia'
-import { FlockOSCatalogStatus, SupportedBoard } from 'src/types'
+import { IronFlockOSCatalogStatus, SupportedBoard } from 'src/types'
 
 type BoardStoreState = {
   items: SupportedBoard[]
   // undefined while loading
-  flockos: FlockOSCatalogStatus | undefined
+  ironflockos: IronFlockOSCatalogStatus | undefined
   initialized: boolean
 }
 
 export const useBoardStore = () => {
   const store = defineStore('board', {
-    state: (): BoardStoreState => ({ items: [], flockos: undefined, initialized: false }),
+    state: (): BoardStoreState => ({ items: [], ironflockos: undefined, initialized: false }),
     getters: { boards: (state) => state.items },
     actions: {
       initialize() {
@@ -23,12 +23,16 @@ export const useBoardStore = () => {
       // before when a refresh fails.
       async refresh(force = false): Promise<void> {
         try {
-          const { boards, flockos } = await window.api.getSupportedBoards(force)
+          const { boards, ironflockos } = await window.api.getSupportedBoards(force)
           if (JSON.stringify(boards) !== JSON.stringify(this.items)) this.items = boards
-          this.flockos = flockos
+          this.ironflockos = ironflockos
         } catch (error: any) {
           console.error('Failed to load the board catalog:', error)
-          this.flockos = { ok: false, code: 'unreachable', error: String(error?.message ?? error) }
+          this.ironflockos = {
+            ok: false,
+            code: 'unreachable',
+            error: String(error?.message ?? error)
+          }
         }
       }
     }

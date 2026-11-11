@@ -104,7 +104,7 @@ export const assertValidFlockConfig = (config: MinimalConfig): void => {
 // <image_id>@<version> (imageKey in src/shared/images.ts): the only way a flash
 // request names its image.
 const IMAGE_KEY =
-  /^flockos-[a-z0-9]+(-[a-z0-9]+)*@(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$/
+  /^ironflockos-[a-z0-9]+(-[a-z0-9]+)*@(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$/
 
 export const isImageKey = (value: unknown): value is string =>
   typeof value === 'string' && value.length <= 256 && IMAGE_KEY.test(value)

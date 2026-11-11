@@ -37,6 +37,12 @@ build:
 preview: build
     npm run start
 
+# The command-line tool into out/cli/flockflasher.cjs, then run it with ARGS
+# (README, "Command line"); writing a disk needs sudo: sudo node out/cli/flockflasher.cjs flash ...
+cli *ARGS:
+    npm run build:cli --silent
+    node out/cli/flockflasher.cjs {{ARGS}}
+
 # -----------------------------------------------------------------------------
 # Package: the installer of the CURRENT OS in dist/, never published. The
 # release workflow runs the same recipes on one runner per OS (see

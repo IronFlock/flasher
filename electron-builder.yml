@@ -9,6 +9,9 @@ files:
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,electron-builder.env,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  # the command-line tool is a file of its own, not part of the app
+  - '!out/cli/**'
+  - '!vite.cli.config.{js,ts,mjs,cjs}'
 asarUnpack:
   - resources/**
   # The elevated FLASH subprocess runs under the bundled real Node (resources/binaries),

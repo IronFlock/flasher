@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { createHash, generateKeyPairSync, sign, KeyObject } from 'node:crypto'
 import {
   CatalogError,
-  FLOCKOS_CATALOG_PUBLIC_KEYS,
+  IRONFLOCKOS_CATALOG_PUBLIC_KEYS,
   MAX_ENVELOPE_BYTES,
   assertNotOlder,
   catalogMessage,
@@ -15,16 +15,17 @@ import {
   parsePublicKeys
 } from '../src/main/security/catalog'
 
-// dl/flockos/manifest.json of IronFlockOS v0.10.0 as published (2026-11-06), and its
-// decoded payload.
-const fixture = (name: string) =>
-  readFileSync(fileURLToPath(new URL(`./fixtures/flockos/${name}`, import.meta.url)))
-const ENVELOPE = fixture('manifest.json')
-const PAYLOAD = fixture('payload.json')
+const fixture = (rel: string) =>
+  readFileSync(fileURLToPath(new URL(`./fixtures/${rel}`, import.meta.url)))
 
-const PRODUCTION_KEYS = parsePublicKeys(FLOCKOS_CATALOG_PUBLIC_KEYS)
+// The v0.10.0 catalog under the IronFlockOS names (ironflockos-<target>-<variant>
+// ids, dl/ironflockos/ downloads), unsigned; ENVELOPE seals it with a
+// throwaway key.
+const PAYLOAD = fixture('ironflockos/payload.json')
 
-// A throwaway signing key, and its line in the FLOCKOS_CATALOG_PUBLIC_KEYS format.
+const PRODUCTION_KEYS = parsePublicKeys(IRONFLOCKOS_CATALOG_PUBLIC_KEYS)
+
+// A throwaway signing key, and its line in the IRONFLOCKOS_CATALOG_PUBLIC_KEYS format.
 const testKey = () => {
   const { privateKey, publicKey } = generateKeyPairSync('ed25519')
   const raw = publicKey.export({ format: 'der', type: 'spki' }).subarray(12)
@@ -38,6 +39,10 @@ const seal = (payload: Buffer, privateKey: KeyObject, message = catalogMessage(p
       signature: sign(null, message, privateKey).toString('base64')
     })
   )
+
+const SIGNER = testKey()
+const KEYS = parsePublicKeys(SIGNER.line)
+const ENVELOPE = seal(PAYLOAD, SIGNER.privateKey)
 
 const expectCode = (fn: () => unknown, code: string) => {
   try {
@@ -57,18 +62,26 @@ const mutatePayload = (change: (doc: any) => void) => {
 }
 
 describe('catalog keys', () => {
-  it('compiles in the Cloud KMS key ironflock-release/flockos-catalog v1', () => {
-    expect(PRODUCTION_KEYS.map((k) => k.id)).toEqual(['f5e1308e'])
+  it('compiles in the Cloud KMS key ironflock-release/ironflockos-catalog v1, and only it', () => {
+    expect(PRODUCTION_KEYS.map((k) => k.id)).toEqual(['036ef3bd'])
+    const der = PRODUCTION_KEYS[0].key.export({ format: 'der', type: 'spki' })
+    expect(der.subarray(12).toString('base64')).toBe('+OG0Ylau0tkCKEDT+WGc9RYHOa9VCSxiOGBBTp7IEQc=')
+    // pki/ironflockos-catalog.pub in IronFlock/ironflockos, as DER
+    expect(createHash('sha256').update(der).digest('hex')).toBe(
+      'b414dc4acdb8dfb6ff8a175f077c7675e32459d52ae5a7c59d87f31b9f5823c8'
+    )
   })
 
   it('accepts several keys (rotation) and comments', () => {
     const extra = testKey()
-    const keys = parsePublicKeys(`${FLOCKOS_CATALOG_PUBLIC_KEYS}\n${extra.line} # next key\n`)
+    const keys = parsePublicKeys(`${IRONFLOCKOS_CATALOG_PUBLIC_KEYS}\n${extra.line} # next key\n`)
     expect(keys).toHaveLength(2)
   })
 
   it('rejects the whole list for one bad line, and an empty list', () => {
-    expect(() => parsePublicKeys(`${FLOCKOS_CATALOG_PUBLIC_KEYS}\nTODO-KEY\n`)).toThrow(/line 4/)
+    expect(() => parsePublicKeys(`${IRONFLOCKOS_CATALOG_PUBLIC_KEYS}\nTODO-KEY\n`)).toThrow(
+      /line 4/
+    )
     expect(() => parsePublicKeys('# no keys\n')).toThrow(/No IronFlockOS catalog key/)
     expect(() => parsePublicKeys('AAAA\n')).toThrow(/32-byte/)
   })
@@ -85,16 +98,16 @@ describe('decodeBase64Strict', () => {
 })
 
 describe('openEnvelope', () => {
-  it('verifies the published v0.10.0 catalog with the production key', () => {
-    const { payload, keyId } = openEnvelope(ENVELOPE, PRODUCTION_KEYS)
-    expect(keyId).toBe('f5e1308e')
+  it('verifies a catalog signed with a trusted key', () => {
+    const { payload, keyId } = openEnvelope(ENVELOPE, KEYS)
+    expect(keyId).toBe(KEYS[0].id)
     expect(payload.equals(PAYLOAD)).toBe(true)
   })
 
   it('signs the documented message', () => {
     const digest = createHash('sha256').update(PAYLOAD).digest('hex')
     expect(catalogMessage(PAYLOAD).toString()).toBe(
-      `flockos-manifest:v1\nflockos/manifest.json\n${digest}`
+      `ironflockos-manifest:v1\nironflockos/manifest.json\n${digest}`
     )
   })
 
@@ -106,10 +119,7 @@ describe('openEnvelope', () => {
     )
     expect(tampered).not.toBe(PAYLOAD.toString())
     envelope.payload = Buffer.from(tampered).toString('base64')
-    expectCode(
-      () => openEnvelope(Buffer.from(JSON.stringify(envelope)), PRODUCTION_KEYS),
-      'bad-signature'
-    )
+    expectCode(() => openEnvelope(Buffer.from(JSON.stringify(envelope)), KEYS), 'bad-signature')
   })
 
   it('rejects a signature made with a key it does not trust', () => {
@@ -122,7 +132,7 @@ describe('openEnvelope', () => {
 
   it('accepts a second listed key (rotation)', () => {
     const next = testKey()
-    const keys = parsePublicKeys(`${FLOCKOS_CATALOG_PUBLIC_KEYS}\n${next.line}`)
+    const keys = parsePublicKeys(`${IRONFLOCKOS_CATALOG_PUBLIC_KEYS}\n${next.line}`)
     expect(openEnvelope(seal(PAYLOAD, next.privateKey), keys).keyId).toBe(keys[1].id)
   })
 
@@ -137,6 +147,9 @@ describe('openEnvelope', () => {
       () => openEnvelope(seal(PAYLOAD, key.privateKey, agentManifest), keys),
       'bad-signature'
     )
+    // the catalog's lines before the rename to IronFlockOS
+    const oldCatalog = Buffer.from(`flockos-manifest:v1\nflockos/manifest.json\n${digest}`)
+    expectCode(() => openEnvelope(seal(PAYLOAD, key.privateKey, oldCatalog), keys), 'bad-signature')
   })
 
   it('rejects an unsigned catalog: the bare payload, or no or an empty signature', () => {
@@ -197,7 +210,7 @@ describe('openEnvelope', () => {
 })
 
 describe('parseCatalogPayload', () => {
-  const catalog = openCatalog(ENVELOPE, PRODUCTION_KEYS)
+  const catalog = openCatalog(ENVELOPE, KEYS)
 
   it('reads the production release and its boards', () => {
     expect(catalog.production).toBe('0.10.0')
@@ -216,8 +229,8 @@ describe('parseCatalogPayload', () => {
       'installer/std'
     ])
     expect(pc.latestImages[0]).toMatchObject({
-      image_id: 'flockos-amd64-efi-base',
-      file: 'flockos-amd64-efi-base-0.10.0.img.gz',
+      image_id: 'ironflockos-amd64-efi-base',
+      file: 'ironflockos-amd64-efi-base-0.10.0.img.gz',
       osvariant: 'image',
       sha256: 'e1a09aa008a3b4fb95ee755c5a4fef76aec3f61b2c4367e3787a05540ed39270',
       size: 620764500
@@ -257,7 +270,7 @@ describe('parseCatalogPayload', () => {
           mutatePayload((d) => {
             const http = d.boards[0].latestImages[0].download.replace('https:', 'http:')
             d.boards[0].latestImages[0].download = http
-            d.releases['0.10.0'].images['flockos-amd64-efi-base'].image.url = http
+            d.releases['0.10.0'].images['ironflockos-amd64-efi-base'].image.url = http
           })
         ),
       'invalid'
@@ -290,7 +303,7 @@ describe('parseCatalogPayload', () => {
               const url = d.boards[0].latestImages[0].download.replace('.img.gz', ext)
               d.boards[0].latestImages[0].download = url
               d.boards[0].latestImages[0].file = url.split('/').pop()
-              d.releases['0.10.0'].images['flockos-amd64-efi-base'].image.url = url
+              d.releases['0.10.0'].images['ironflockos-amd64-efi-base'].image.url = url
             })
           ),
         'invalid'
@@ -325,9 +338,9 @@ describe('forward compatibility', () => {
   // Adds an image to release 0.10.0 and returns its board entry.
   const addImage = (d: any, id: string, variant: string, kernel: string, architecture: string) => {
     const base = d.boards[0].latestImages[0]
-    const url = base.download.replace('flockos-amd64-efi-base', id)
+    const url = base.download.replace('ironflockos-amd64-efi-base', id)
     d.releases['0.10.0'].images[id] = {
-      target: id.replace(/^flockos-/, ''),
+      target: id.replace(/^ironflockos-/, ''),
       variant,
       kernel,
       architecture,
@@ -341,17 +354,17 @@ describe('forward compatibility', () => {
     const parsed = parseCatalogPayload(
       mutatePayload((d) => {
         d.boards[0].latestImages.push(
-          addImage(d, 'flockos-amd64-efi-kiosk', 'kiosk', 'std', 'amd64')
+          addImage(d, 'ironflockos-amd64-efi-kiosk', 'kiosk', 'std', 'amd64')
         )
         d.boards[0].latestImages.push(
-          addImage(d, 'flockos-amd64-efi-base-ll', 'base', 'lowlatency', 'amd64')
+          addImage(d, 'ironflockos-amd64-efi-base-ll', 'base', 'lowlatency', 'amd64')
         )
         d.boards.push({
           ...d.boards[0],
           architecture: 'riscv64',
           model: 'riscv64-efi',
           modelname: 'RISC-V machine with UEFI',
-          latestImages: [addImage(d, 'flockos-riscv64-efi-base', 'base', 'std', 'riscv64')]
+          latestImages: [addImage(d, 'ironflockos-riscv64-efi-base', 'base', 'std', 'riscv64')]
         })
       })
     )
@@ -362,10 +375,10 @@ describe('forward compatibility', () => {
       'raspberrypi5'
     ])
     expect(parsed.boards[0].latestImages.map((i) => i.image_id)).toEqual([
-      'flockos-amd64-efi-base',
-      'flockos-amd64-efi-nvidia',
-      'flockos-amd64-efi-base-rt',
-      'flockos-amd64-efi-installer'
+      'ironflockos-amd64-efi-base',
+      'ironflockos-amd64-efi-nvidia',
+      'ironflockos-amd64-efi-base-rt',
+      'ironflockos-amd64-efi-installer'
     ])
     const logged = warn.mock.calls.map((call) => String(call[0])).join('\n')
     expect(logged).toMatch(/variant kiosk is unknown/)
@@ -379,8 +392,8 @@ describe('forward compatibility', () => {
     const parsed = parseCatalogPayload(
       mutatePayload((d) => {
         d.boards[1].latestImages = [
-          addImage(d, 'flockos-arm64-efi-kiosk', 'kiosk', 'std', 'arm64'),
-          addImage(d, 'flockos-arm64-efi-base-ll', 'base', 'lowlatency', 'arm64')
+          addImage(d, 'ironflockos-arm64-efi-kiosk', 'kiosk', 'std', 'arm64'),
+          addImage(d, 'ironflockos-arm64-efi-base-ll', 'base', 'lowlatency', 'arm64')
         ]
       })
     )
@@ -397,7 +410,7 @@ describe('forward compatibility', () => {
       () =>
         parseCatalogPayload(
           mutatePayload(
-            (d) => (d.releases['0.10.0'].images['flockos-amd64-efi-base'].variant = 'kiosk')
+            (d) => (d.releases['0.10.0'].images['ironflockos-amd64-efi-base'].variant = 'kiosk')
           )
         ),
       'invalid'
@@ -410,8 +423,12 @@ describe('installer payloads', () => {
     vi.restoreAllMocks()
   })
 
-  const INSTALLER = 'flockos-amd64-efi-installer'
-  const ALL = ['flockos-amd64-efi-base', 'flockos-amd64-efi-base-rt', 'flockos-amd64-efi-nvidia']
+  const INSTALLER = 'ironflockos-amd64-efi-installer'
+  const ALL = [
+    'ironflockos-amd64-efi-base',
+    'ironflockos-amd64-efi-base-rt',
+    'ironflockos-amd64-efi-nvidia'
+  ]
   const installerOf = (parsed: { boards: any[] }, model: string) =>
     parsed.boards
       .find((b) => b.model === model)
@@ -425,9 +442,9 @@ describe('installer payloads', () => {
     })
 
   it('reads a missing payloads as the target base image (v0.10.0)', () => {
-    const catalog = openCatalog(ENVELOPE, PRODUCTION_KEYS)
-    expect(installerOf(catalog, 'amd64-efi')?.payloads).toEqual(['flockos-amd64-efi-base'])
-    expect(installerOf(catalog, 'arm64-efi')?.payloads).toEqual(['flockos-arm64-efi-base'])
+    const catalog = openCatalog(ENVELOPE, KEYS)
+    expect(installerOf(catalog, 'amd64-efi')?.payloads).toEqual(['ironflockos-amd64-efi-base'])
+    expect(installerOf(catalog, 'arm64-efi')?.payloads).toEqual(['ironflockos-arm64-efi-base'])
     expect(installerOf(catalog, 'raspberrypi4')).toBeUndefined()
     expect(catalog.boards[0].latestImages[0].payloads).toBeUndefined()
   })
@@ -443,28 +460,31 @@ describe('installer payloads', () => {
   it('drops payloads that are not images of the release and target, with a log line', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     const odd = [
-      'flockos-amd64-efi-base',
-      'flockos-amd64-efi-kiosk',
-      'flockos-arm64-efi-base',
+      'ironflockos-amd64-efi-base',
+      'ironflockos-amd64-efi-kiosk',
+      'ironflockos-arm64-efi-base',
       INSTALLER,
-      'flockos-amd64-efi-base'
+      'ironflockos-amd64-efi-base'
     ]
     const parsed = parseCatalogPayload(withPayloads(odd))
-    expect(installerOf(parsed, 'amd64-efi')?.payloads).toEqual(['flockos-amd64-efi-base'])
+    expect(installerOf(parsed, 'amd64-efi')?.payloads).toEqual(['ironflockos-amd64-efi-base'])
     expect(warn.mock.calls.map((c) => String(c[0])).join('\n')).toMatch(
-      /dropping payload flockos-amd64-efi-kiosk/
+      /dropping payload ironflockos-amd64-efi-kiosk/
     )
   })
 
   it('refuses payloads that are not a list of ids, or that differ between board and release', () => {
-    expectCode(() => parseCatalogPayload(withPayloads('flockos-amd64-efi-base')), 'invalid')
+    expectCode(() => parseCatalogPayload(withPayloads('ironflockos-amd64-efi-base')), 'invalid')
     expectCode(() => parseCatalogPayload(withPayloads([42])), 'invalid')
-    expectCode(() => parseCatalogPayload(withPayloads(ALL, ['flockos-amd64-efi-base'])), 'invalid')
+    expectCode(
+      () => parseCatalogPayload(withPayloads(ALL, ['ironflockos-amd64-efi-base'])),
+      'invalid'
+    )
   })
 })
 
 describe('assertNotOlder', () => {
-  const current = openCatalog(ENVELOPE, PRODUCTION_KEYS)
+  const current = openCatalog(ENVELOPE, KEYS)
   const older = {
     ...current,
     issuedAt: '2026-11-01T00:00:00Z',
