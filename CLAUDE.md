@@ -7,3 +7,4 @@ The full instructions are shared with GitHub Copilot and live in the file below:
 @.github/copilot-instructions.md
 
 @AGENTS.md
+@.ai/working-agreements.md
